@@ -211,6 +211,15 @@
     <div class="group">
       <div class="field">
         <div class="field-head">
+          <span class="field-name">Всплывать при ответе агента</span>
+          <label class="switch"><input type="checkbox" id="popupOnAnswer" /><span></span></label>
+        </div>
+        <div class="hint">Когда агент закончил отвечать, а окно спрятано — оно выедет
+          из-за края само.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
           <span class="field-name">Анимация появления</span>
           <label class="switch"><input type="checkbox" id="animate" /><span></span></label>
         </div>
@@ -283,6 +292,7 @@
     cardAlpha: el('cardAlpha'),
     hotkey: el('hotkey'),
     animate: el('animate'),
+    popupOnAnswer: el('popupOnAnswer'),
     blur: el('blur'),
     zoom: el('zoom'),
   };
@@ -298,6 +308,7 @@
     cardAlpha: 0.7,
     hotkey: 'Control+Alt+H',
     animate: true,
+    popupOnAnswer: true,
     blur: false,
   };
 
@@ -393,6 +404,7 @@
     inputs.model.value = Math.round((state.modelScale ?? 1) * 100);
     inputs.glass.checked = state.glass !== false;
     inputs.animate.checked = state.animate !== false;
+    inputs.popupOnAnswer.checked = state.popupOnAnswer !== false;
     inputs.blur.checked = state.blur === true;
     inputs.zoom.value = Math.round((state.zoomPanel ?? 1.36) * 100);
     // Ползунок показывает прозрачность: 1 − плотность тона.
@@ -472,6 +484,9 @@
   inputs.animate.addEventListener('change', () => {
     push({ animate: inputs.animate.checked }, true);
   });
+  inputs.popupOnAnswer.addEventListener('change', () => {
+    push({ popupOnAnswer: inputs.popupOnAnswer.checked }, true);
+  });
   inputs.blur.addEventListener('change', () => {
     push({ blur: inputs.blur.checked }, true);
   });
@@ -501,4 +516,5 @@
 </script>
 </body>
 </html>
+
 

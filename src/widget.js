@@ -275,6 +275,29 @@
     if (found.length) window.dshWidget.report(found);
   }
 
+  // Всплытие при ответе агента. Пока агент работает, кнопка отправки называется
+  // «Queue message», а в ленте есть маркер «running»; когда ответ готов, всё это
+  // исчезает. Ловим именно переход «работал → готово» и просим окно показаться.
+  let wasBusy = null;
+
+  function agentBusy() {
+    const primary = document.querySelector('[class*="_composerSeat"] [class*="_primary"]');
+    const label = primary?.getAttribute('aria-label') || '';
+    if (/queue|stop|cancel|останов/i.test(label)) return true;
+    if (/send|submit|отправ/i.test(label)) return false;
+    return !!document.querySelector('[class*="_running"]');
+  }
+
+  function watchAnswer() {
+    const busy = agentBusy();
+    if (wasBusy === null) {
+      wasBusy = busy;
+      return;
+    }
+    if (wasBusy && !busy) window.dshWidget?.action('agent-answer');
+    wasBusy = busy;
+  }
+
   const start = () => {
     apply();
     glassify();
@@ -283,6 +306,7 @@
       schedule();
       reportTranslucent();
       syncPanelState();
+      watchAnswer();
     });
     observer.observe(document.body, {
       childList: true,
@@ -308,6 +332,9 @@
       }
     }, true);
     setInterval(reportTranslucent, 1500);
+    // Ответ может прийти без изменений в разметке, которые мы отслеживаем,
+    // поэтому состояние «работает / готово» проверяем ещё и по таймеру.
+    setInterval(watchAnswer, 1000);
     // Резервная проверка на случай, если панель ушла без событий.
     setInterval(syncPanelState, 900);
   };

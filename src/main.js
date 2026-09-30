@@ -49,6 +49,8 @@ const DEFAULT_CONFIG = {
   // Открывать окно сразу при входе в Windows. По умолчанию виджет ждёт в трее,
   // пока его не позовут горячей клавишей.
   showOnStartup: false,
+  // Показывать окно, когда агент закончил отвечать.
+  popupOnAnswer: true,
   alwaysOnTop: true,
 };
 
@@ -889,6 +891,7 @@ function settingsPayload() {
     hotkeyError,
     animate: config.animate !== false,
     blur: config.blur === true,
+    popupOnAnswer: config.popupOnAnswer !== false,
     zoomPanel: config.zoomPanel ?? 0.8,
   };
 }
@@ -1011,6 +1014,9 @@ function applySettings(patch = {}) {
   if (typeof patch.blur === 'boolean') {
     config.blur = patch.blur;
     applyGlass();
+  }
+  if (typeof patch.popupOnAnswer === 'boolean') {
+    config.popupOnAnswer = patch.popupOnAnswer;
   }
   if (typeof patch.hotkey === 'string' && patch.hotkey && patch.hotkey !== config.hotkey) {
     const previous = config.hotkey;
@@ -1149,6 +1155,14 @@ ipcMain.on('widget:action', (_event, action) => {
     case 'reload':
       loadHarness();
       break;
+    // Агент закончил отвечать — показываем окно, если оно спрятано.
+    case 'agent-answer':
+      console.log('[widget] ответ агента готов; окно было видимо:', windowState.visible);
+      if (config.popupOnAnswer !== false && !windowState.visible) {
+        showWindow();
+        win?.flashFrame(true);
+      }
+      break;
     case 'start-harness':
       runLauncher('Start-Harness.ps1');
       setTimeout(() => loadHarness(), 8000);
@@ -1264,6 +1278,13 @@ if (!app.requestSingleInstanceLock()) {
           }, 1200);
         }, 1200);
       }, 6000);
+    }
+    if (process.env.WIDGET_ANSWER_TEST) {
+      // Проверка всплытия: прячем окно, дальше страница сама сообщит о готовом ответе.
+      setTimeout(() => {
+        hideWindow();
+        console.log('[widget] окно спрятано — ждём ответ агента');
+      }, 7000);
     }
     if (process.env.WIDGET_SETTINGS) showSettings();
     if (process.env.WIDGET_SETTINGS_TEST) {
@@ -1391,5 +1412,6 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
 
 

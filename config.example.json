@@ -14,5 +14,6 @@
   "cardAlpha": 0.14,
   "animate": true,
   "blur": false,
-  "showOnStartup": false
+  "showOnStartup": false,
+  "popupOnAnswer": true
 }
