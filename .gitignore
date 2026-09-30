@@ -21,3 +21,4 @@ tools/preview-diff-popup.js
 Thumbs.db
 desktop.ini
 *.log
+dist/

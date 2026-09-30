@@ -6,7 +6,7 @@
 
 const {
   app, BaseWindow, WebContentsView, ipcMain, screen, Tray, Menu,
-  nativeImage, globalShortcut, shell, net,
+  nativeImage, globalShortcut, shell, net, Notification,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -35,6 +35,8 @@ const DEFAULT_CONFIG = {
   launcherDir: '',
   url: '',
   hotkey: 'Control+Alt+H',
+  // Вторая клавиша: открыть виджет и сразу встать в поле ввода.
+  focusHotkey: 'Control+Shift+Space',
   panelWidth: 440,
   panelHeightRatio: 1 / 3,
   zoomPanel: 0.8,
@@ -51,6 +53,9 @@ const DEFAULT_CONFIG = {
   showOnStartup: false,
   // Показывать окно, когда агент закончил отвечать.
   popupOnAnswer: true,
+  // Показывать уведомление Windows о готовом ответе и звук к нему.
+  notifyOnAnswer: true,
+  notifySound: true,
   alwaysOnTop: true,
 };
 
@@ -541,6 +546,9 @@ function glassEnabled() {
 // Горячая клавиша может быть занята другой программой — тогда регистрация
 // возвращает false, и мы возвращаем прежнее сочетание.
 let hotkeyError = '';
+let focusHotkeyError = '';
+// Состояние агента для значка в трее: idle | busy | done.
+let agentState = 'idle';
 
 // Автозапуск при входе в Windows. По умолчанию виджет прописывается с флагом
 // --hidden: стартует скрытым, живёт в трее и появляется по горячей клавише.
@@ -578,6 +586,44 @@ function setAutostart(enable) {
   } catch (err) {
     console.error('[widget] автозапуск:', err.message);
   }
+}
+
+// Открывает виджет и ставит курсор в поле ввода — чтобы сразу печатать.
+function focusComposer() {
+  if (!windowState.visible) showWindow();
+  if (!harnessView) return;
+  win?.focus();
+  harnessView.webContents.focus();
+  harnessView.webContents.executeJavaScript(
+    '(() => { const input = document.querySelector(\'[class*="_input"]\');'
+    + ' if (!input) return false; input.focus();'
+    + ' const range = document.createRange(); range.selectNodeContents(input);'
+    + ' const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);'
+    + ' return true; })()',
+  ).catch(() => { /* страница ещё не готова — окно всё равно показано */ });
+}
+
+// Две горячие клавиши: показать/скрыть и «сразу писать». Обе регистрируем заново,
+// потому что globalShortcut не умеет менять сочетание на месте.
+function registerHotkeys() {
+  try {
+    globalShortcut.unregisterAll();
+  } catch { /* нечего снимать */ }
+  const errors = { hotkey: '', focusHotkey: '' };
+  const bind = (accelerator, handler, which) => {
+    if (!accelerator) return;
+    try {
+      if (!globalShortcut.register(accelerator, handler)) {
+        errors[which] = `Сочетание ${accelerator} занято другой программой`;
+      }
+    } catch (err) {
+      errors[which] = `Сочетание ${accelerator} не принято системой`;
+      console.error('[widget] горячая клавиша:', err.message);
+    }
+  };
+  bind(config.hotkey, toggleWindow, 'hotkey');
+  bind(config.focusHotkey, focusComposer, 'focusHotkey');
+  return errors;
 }
 
 function registerHotkey(accelerator) {
@@ -746,6 +792,13 @@ function createWindow() {
   win.on('closed', () => {
     win = null;
   });
+  // Окно вернули в фокус — состояние «ответ готов» в трее больше не нужно.
+  win.on('focus', () => {
+    if (agentState === 'done') {
+      agentState = 'idle';
+      updateTrayState();
+    }
+  });
 
   loadHarness().then(() => {
     // Запуск из автозагрузки: окно ждёт в трее, пока его не позовут горячей
@@ -779,13 +832,48 @@ function rebuildWindow() {
 
 // ---------------------------------------------------------------- tray
 
-function trayIcon() {
-  const file = path.join(ROOT, 'assets', 'icon.png');
-  if (fs.existsSync(file)) {
+function trayIcon(variant = 'idle') {
+  const names = { idle: 'icon.png', busy: 'icon-busy.png', done: 'icon-done.png' };
+  for (const name of [names[variant], names.idle]) {
+    const file = path.join(ROOT, 'assets', name);
+    if (!fs.existsSync(file)) continue;
     const image = nativeImage.createFromPath(file);
     if (!image.isEmpty()) return image;
   }
   return nativeImage.createEmpty();
+}
+
+// Состояние агента в трее: работает — янтарная точка, ответил — зелёная.
+// Как только окно получило фокус, состояние возвращается к обычному.
+function updateTrayState() {
+  if (!tray) return;
+  const variant = agentState === 'busy' ? 'busy' : (agentState === 'done' ? 'done' : 'idle');
+  tray.setImage(trayIcon(variant));
+  const labels = {
+    idle: 'Harness Widget',
+    busy: 'Harness Widget — агент работает',
+    done: 'Harness Widget — ответ готов',
+  };
+  tray.setToolTip(labels[variant] || labels.idle);
+}
+
+// Тост Windows о готовом ответе: всплытие окна не видно, если ты в полноэкранной
+// игре, а уведомление видно всегда. Клик по нему открывает виджет.
+function notifyAnswer() {
+  if (config.notifyOnAnswer === false) return;
+  if (!Notification.isSupported()) return;
+  try {
+    const notification = new Notification({
+      title: 'Ответ готов',
+      body: 'Агент закончил отвечать — можно посмотреть результат.',
+      icon: path.join(ROOT, 'assets', 'icon-done.png'),
+      silent: config.notifySound === false,
+    });
+    notification.on('click', () => showWindow());
+    notification.show();
+  } catch (err) {
+    console.error('[widget] уведомление:', err.message);
+  }
 }
 
 function buildTrayMenu() {
@@ -857,8 +945,8 @@ function buildTrayMenu() {
 }
 
 function createTray() {
-  tray = new Tray(trayIcon());
-  tray.setToolTip('Harness Widget');
+  tray = new Tray(trayIcon('idle'));
+  updateTrayState();
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', toggleWindow);
 }
@@ -889,9 +977,15 @@ function settingsPayload() {
     cardAlpha: config.cardAlpha ?? 0.7,
     hotkey: config.hotkey,
     hotkeyError,
+    focusHotkey: config.focusHotkey,
+    focusHotkeyError,
+    launcherDir: config.launcherDir || '',
+    url: config.url || '',
     animate: config.animate !== false,
     blur: config.blur === true,
     popupOnAnswer: config.popupOnAnswer !== false,
+    notifyOnAnswer: config.notifyOnAnswer !== false,
+    notifySound: config.notifySound !== false,
     zoomPanel: config.zoomPanel ?? 0.8,
   };
 }
@@ -1018,16 +1112,46 @@ function applySettings(patch = {}) {
   if (typeof patch.popupOnAnswer === 'boolean') {
     config.popupOnAnswer = patch.popupOnAnswer;
   }
-  if (typeof patch.hotkey === 'string' && patch.hotkey && patch.hotkey !== config.hotkey) {
-    const previous = config.hotkey;
-    if (registerHotkey(patch.hotkey)) {
-      config.hotkey = patch.hotkey;
-      hotkeyError = '';
-      refreshTray();
-    } else {
-      registerHotkey(previous);
-      hotkeyError = `Сочетание ${patch.hotkey} занято другой программой`;
+  if (typeof patch.notifyOnAnswer === 'boolean') {
+    config.notifyOnAnswer = patch.notifyOnAnswer;
+  }
+  if (typeof patch.notifySound === 'boolean') {
+    config.notifySound = patch.notifySound;
+  }
+  // Горячие клавиши: обе перерегистрируются вместе, потому что globalShortcut
+  // не умеет менять сочетание на месте. Если новое занято — остаётся прежнее.
+  const hotkeyChanged = (typeof patch.hotkey === 'string' && patch.hotkey && patch.hotkey !== config.hotkey)
+    || (typeof patch.focusHotkey === 'string' && patch.focusHotkey && patch.focusHotkey !== config.focusHotkey);
+  if (hotkeyChanged) {
+    const previous = { hotkey: config.hotkey, focusHotkey: config.focusHotkey };
+    if (typeof patch.hotkey === 'string' && patch.hotkey) config.hotkey = patch.hotkey;
+    if (typeof patch.focusHotkey === 'string' && patch.focusHotkey) config.focusHotkey = patch.focusHotkey;
+
+    const errors = registerHotkeys();
+    if (config.hotkey === config.focusHotkey) {
+      errors.focusHotkey = 'Это сочетание уже занято первой горячей клавишей';
     }
+    if (errors.hotkey || errors.focusHotkey) {
+      // Что-то не занялось: возвращаем прежние сочетания и сообщаем причину.
+      config.hotkey = previous.hotkey;
+      config.focusHotkey = previous.focusHotkey;
+      const retry = registerHotkeys();
+      hotkeyError = errors.hotkey || '';
+      focusHotkeyError = errors.focusHotkey || '';
+      if (!hotkeyError && retry.hotkey) hotkeyError = '';
+    } else {
+      hotkeyError = '';
+      focusHotkeyError = '';
+    }
+    refreshTray();
+  }
+  if (typeof patch.launcherDir === 'string' && patch.launcherDir !== config.launcherDir) {
+    config.launcherDir = patch.launcherDir;
+  }
+  if (typeof patch.url === 'string' && patch.url !== config.url) {
+    config.url = patch.url;
+    // Адрес мог измениться — перечитываем страницу с новым.
+    setTimeout(() => loadHarness(), 300);
   }
   if (typeof patch.panelWidth === 'number') {
     config.panelWidth = Math.round(clamp(patch.panelWidth, 320, 900));
@@ -1155,13 +1279,23 @@ ipcMain.on('widget:action', (_event, action) => {
     case 'reload':
       loadHarness();
       break;
-    // Агент закончил отвечать — показываем окно, если оно спрятано.
+    // Агент начал отвечать — янтарная точка в трее.
+    case 'agent-busy':
+      if (agentState !== 'busy') {
+        agentState = 'busy';
+        updateTrayState();
+      }
+      break;
+    // Агент закончил: зелёная точка, всплытие и уведомление Windows.
     case 'agent-answer':
+      agentState = 'done';
+      updateTrayState();
       console.log('[widget] ответ агента готов; окно было видимо:', windowState.visible);
       if (config.popupOnAnswer !== false && !windowState.visible) {
         showWindow();
         win?.flashFrame(true);
       }
+      notifyAnswer();
       break;
     case 'start-harness':
       runLauncher('Start-Harness.ps1');
@@ -1226,11 +1360,9 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
 
-    const ok = registerHotkey(config.hotkey);
-    if (!ok) {
-      hotkeyError = `Сочетание ${config.hotkey} занято другой программой`;
-      console.error('[widget] не удалось занять горячую клавишу', config.hotkey);
-    }
+    ({ hotkeyError, focusHotkeyError } = registerHotkeys());
+    if (hotkeyError) console.error('[widget] горячая клавиша:', hotkeyError);
+    if (focusHotkeyError) console.error('[widget] клавиша ввода:', focusHotkeyError);
 
     // Разовая настройка автозапуска из командной строки:
     // WIDGET_AUTOSTART=1 включает, WIDGET_AUTOSTART=0 выключает.
@@ -1277,6 +1409,13 @@ if (!app.requestSingleInstanceLock()) {
             app.quit();
           }, 1200);
         }, 1200);
+      }, 6000);
+    }
+    if (process.env.WIDGET_FOCUS_TEST) {
+      // Проверка клавиши «писать сразу»: показать окно и встать в поле ввода.
+      setTimeout(() => {
+        focusComposer();
+        console.log('[widget] фокус в поле ввода запрошен');
       }, 6000);
     }
     if (process.env.WIDGET_ANSWER_TEST) {
@@ -1412,6 +1551,9 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
+
+
 
 
 

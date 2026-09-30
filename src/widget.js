@@ -294,6 +294,7 @@
       wasBusy = busy;
       return;
     }
+    if (!wasBusy && busy) window.dshWidget?.action('agent-busy');
     if (wasBusy && !busy) window.dshWidget?.action('agent-answer');
     wasBusy = busy;
   }

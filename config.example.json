@@ -15,5 +15,8 @@
   "animate": true,
   "blur": false,
   "showOnStartup": false,
-  "popupOnAnswer": true
+  "popupOnAnswer": true,
+  "focusHotkey": "Control+Shift+Space",
+  "notifyOnAnswer": true,
+  "notifySound": true
 }

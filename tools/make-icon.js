@@ -34,7 +34,17 @@ function inLetterH(x, y) {
   return isStem || isBar;
 }
 
-function renderPixels() {
+// Точка состояния в правом нижнем углу: агент работает (янтарная) или ответил
+// (зелёная). У обычной иконки точки нет.
+function inStatusDot(x, y) {
+  const cx = 25;
+  const cy = 25;
+  const dx = x - cx;
+  const dy = y - cy;
+  return dx * dx + dy * dy <= 12; // радиус ~3.5 px
+}
+
+function renderPixels(variant = 'idle') {
   const raw = Buffer.alloc(SIZE * (SIZE * 4 + 1));
   let offset = 0;
   for (let y = 0; y < SIZE; y += 1) {
@@ -52,6 +62,16 @@ function renderPixels() {
         a = 0;
       } else if (inLetterH(x, y)) {
         r = 255; g = 255; b = 255;
+      }
+
+      if (variant !== 'idle' && inside && inStatusDot(x, y)) {
+        if (variant === 'done') {
+          r = 74; g = 222; b = 128;
+        } else {
+          r = 255; g = 179; b = 71;
+        }
+        g = variant === 'done' ? 222 : g;
+        a = 255;
       }
 
       raw[offset] = r;
@@ -91,7 +111,7 @@ function chunk(type, data) {
   return Buffer.concat([length, typeAndData, crc]);
 }
 
-function buildPng() {
+function buildPng(variant = 'idle') {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(SIZE, 0);
@@ -101,7 +121,7 @@ function buildPng() {
   ihdr[10] = 0;  // deflate
   ihdr[11] = 0;  // adaptive filtering
   ihdr[12] = 0;  // no interlace
-  const idat = zlib.deflateSync(renderPixels(), { level: 9 });
+  const idat = zlib.deflateSync(renderPixels(variant), { level: 9 });
   return Buffer.concat([
     signature,
     chunk('IHDR', ihdr),
@@ -112,6 +132,9 @@ function buildPng() {
 
 const outDir = path.join(__dirname, '..', 'assets');
 fs.mkdirSync(outDir, { recursive: true });
-const outFile = path.join(outDir, 'icon.png');
-fs.writeFileSync(outFile, buildPng());
-console.log('icon written:', outFile);
+for (const [variant, file] of [['idle', 'icon.png'], ['busy', 'icon-busy.png'], ['done', 'icon-done.png']]) {
+  const outFile = path.join(outDir, file);
+  fs.writeFileSync(outFile, buildPng(variant));
+  console.log('icon written:', outFile);
+}
+

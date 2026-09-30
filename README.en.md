@@ -67,6 +67,11 @@ The gear button in the widget header opens the settings window, “Interface” 
 | Card transparency | The input field and message cards: they are always denser than the background |
 | Appearance animation | The window slides in from the right edge and slides back out |
 | Pop up on agent answer | Shows the window when the agent has finished answering |
+| Windows notification | A toast in the corner of the screen when the answer is ready — visible even in a fullscreen game |
+| Notification sound | A sound alongside the toast |
+| Start typing hotkey | A second combination: open the widget and focus the input field |
+| Launcher folder | Where the Harness address and the launch scripts live |
+| Harness address | An explicit address; empty — taken from the launcher state |
 | Window position | “Return to place” button — resets to the right edge of the screen |
 | Hotkey | Show and hide the widget from anywhere |
 | Menu font | Scale of the session menu, 60–200 % |
@@ -287,6 +292,41 @@ moment the agent finishes, or on the global hotkey.
 
 It can be turned off with the “Pop up on agent answer” switch in the settings.
 
+## Tray state and notifications
+
+The tray icon shows the agent state without opening the window:
+
+| Icon | Meaning |
+|---|---|
+| Plain | The agent is idle |
+| With an amber dot | The agent is working on an answer |
+| With a green dot | The answer is ready and waiting |
+
+Once the window gets focus, the green dot turns back to plain.
+
+If an answer arrives while the window was hidden, the widget pops up and additionally shows a
+**Windows notification** in the corner of the screen. That covers the case where popping up cannot
+be noticed — a fullscreen game, for instance. Clicking the notification opens the widget. Both the
+notification and its sound can be turned off with separate switches in the settings.
+
+## Portable build
+
+The widget can be built into a folder that runs without Node.js and npm:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-portable.ps1
+```
+
+It produces `dist\HarnessWidget\` with the Electron runtime inside and
+`dist\HarnessWidget-portable.zip`. Two commands are included: `HarnessWidget.cmd` for a normal
+launch and `Автозапуск.cmd` to register Windows autostart with tray waiting.
+
+The archive is about 100 MB: most of it is Electron itself.
+
+**About the Windows warning.** The build is not code-signed, so SmartScreen may show "Unknown
+publisher" on first launch. Signing requires a paid certificate, so it is more honest to warn
+about it here than to promise a signed installer.
+
 ## Limitations
 
 - **No Harness — no widget.** The widget has no copy of its own: it only connects to the local
@@ -305,6 +345,8 @@ It can be turned off with the “Pop up on agent answer” switch in the setting
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
+
 
 
 

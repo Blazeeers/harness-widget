@@ -5,7 +5,9 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-const ALLOWED = new Set(['reload', 'start-harness', 'open-browser', 'opacity-report', 'agent-answer']);
+const ALLOWED = new Set([
+  'reload', 'start-harness', 'open-browser', 'opacity-report', 'agent-answer', 'agent-busy',
+]);
 
 contextBridge.exposeInMainWorld('dshWidget', {
   action: (name) => {

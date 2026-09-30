@@ -211,6 +211,23 @@
     <div class="group">
       <div class="field">
         <div class="field-head">
+          <span class="field-name">Уведомление Windows</span>
+          <label class="switch"><input type="checkbox" id="notifyOnAnswer" /><span></span></label>
+        </div>
+        <div class="hint">Тост в углу экрана, когда ответ готов. Виден даже там, где всплытие
+          окна заметить нельзя — например, в полноэкранной игре. Клик по нему открывает виджет.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Звук уведомления</span>
+          <label class="switch"><input type="checkbox" id="notifySound" /><span></span></label>
+        </div>
+        <div class="hint">Звуковой сигнал вместе с тостом.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
           <span class="field-name">Всплывать при ответе агента</span>
           <label class="switch"><input type="checkbox" id="popupOnAnswer" /><span></span></label>
         </div>
@@ -233,6 +250,34 @@
         </div>
         <div class="hint" id="hotkey-hint">Открывает и скрывает виджет из любого места.
           Нажми на сочетание, затем нажми новое. Esc — отмена, Backspace — вернуть по умолчанию.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Клавиша «писать сразу»</span>
+          <button class="keycap" id="focusHotkey" title="Нажми, чтобы записать сочетание">Ctrl+Shift+Space</button>
+        </div>
+        <div class="hint" id="focusHotkey-hint">Открывает виджет и сразу ставит курсор в поле ввода —
+          можно печатать без лишнего клика. Esc — отмена, Backspace — вернуть по умолчанию.</div>
+      </div>
+    </div>
+
+    <h2>Подключение</h2>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-head"><span class="field-name">Папка лаунчера</span></div>
+        <input type="text" id="launcherDir" placeholder="например, F:\Automatic Harness Runner" />
+        <div class="hint">Где лежат <code>state/harness.json</code> с адресом харнесса и скрипты
+          <code>Start-Harness.ps1</code>/<code>Stop-Harness.ps1</code>. Нужна только для этих
+          возможностей: подключение работает и без неё.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><span class="field-name">Адрес харнесса</span></div>
+        <input type="text" id="url" placeholder="http://127.0.0.1:3080" />
+        <div class="hint">Если пусто — адрес берётся из состояния лаунчера. Меняя адрес,
+          виджет перезагрузит страницу.</div>
       </div>
     </div>
 
@@ -291,8 +336,13 @@
     glassAlpha: el('glassAlpha'),
     cardAlpha: el('cardAlpha'),
     hotkey: el('hotkey'),
+    focusHotkey: el('focusHotkey'),
+    launcherDir: el('launcherDir'),
+    url: el('url'),
     animate: el('animate'),
     popupOnAnswer: el('popupOnAnswer'),
+    notifyOnAnswer: el('notifyOnAnswer'),
+    notifySound: el('notifySound'),
     blur: el('blur'),
     zoom: el('zoom'),
   };
@@ -307,14 +357,22 @@
     glassAlpha: 0.55,
     cardAlpha: 0.7,
     hotkey: 'Control+Alt+H',
+    focusHotkey: 'Control+Shift+Space',
+    launcherDir: '',
+    url: '',
     animate: true,
     popupOnAnswer: true,
+    notifyOnAnswer: true,
+    notifySound: true,
     blur: false,
   };
 
-  const hint = el('hotkey-hint');
-  const HOTKEY_HINT = hint.textContent;
-  let recording = false;
+  // Подсказки запоминаем сразу: после ошибки их нужно вернуть в исходный вид.
+  const HOTKEY_HINTS = {
+    hotkey: el('hotkey-hint').textContent,
+    focusHotkey: el('focusHotkey-hint').textContent,
+  };
+  let recording = null;
   let lastState = {};
 
   // Electron принимает сочетания вида «Control+Alt+H», показываем привычнее.
@@ -350,35 +408,49 @@
     return [...modifiers, name].join('+');
   }
 
-  inputs.hotkey.addEventListener('click', () => {
-    recording = true;
-    inputs.hotkey.classList.add('recording');
-    inputs.hotkey.textContent = 'Нажми сочетание…';
-    hint.textContent = 'Нажми новое сочетание. Esc — отмена, Backspace — вернуть по умолчанию.';
-    hint.classList.remove('error');
-  });
+  function startRecording(which) {
+    const hintEl = el(`${which}-hint`);
+    recording = { which, restore: HOTKEY_HINTS[which] };
+    inputs[which].classList.add('recording');
+    inputs[which].textContent = 'Нажми сочетание…';
+    hintEl.textContent = 'Нажми новое сочетание. Esc — отмена, Backspace — вернуть по умолчанию.';
+    hintEl.classList.remove('error');
+  }
+
+  function stopRecording() {
+    if (!recording) return;
+    inputs[recording.which].classList.remove('recording');
+    el(`${recording.which}-hint`).textContent = recording.restore;
+    recording = null;
+  }
+
+  for (const which of ['hotkey', 'focusHotkey']) {
+    inputs[which].addEventListener('click', () => startRecording(which));
+  }
 
   // Слушаем в фазе перехвата, чтобы Esc отменял запись, а не закрывал настройки.
   window.addEventListener('keydown', (event) => {
     if (!recording) return;
     event.preventDefault();
     event.stopPropagation();
+    const { which } = recording;
     if (event.key === 'Escape') {
-      recording = false;
+      stopRecording();
       render(lastState);
       return;
     }
     if (event.key === 'Backspace' || event.key === 'Delete') {
-      recording = false;
-      inputs.hotkey.textContent = prettyHotkey(DEFAULT.hotkey);
-      push({ hotkey: DEFAULT.hotkey }, true);
+      const fallback = DEFAULT[which];
+      inputs[which].textContent = prettyHotkey(fallback);
+      stopRecording();
+      push({ [which]: fallback }, true);
       return;
     }
     const combo = toAccelerator(event);
     if (!combo) return;
-    recording = false;
-    inputs.hotkey.textContent = prettyHotkey(combo);
-    push({ hotkey: combo }, true);
+    inputs[which].textContent = prettyHotkey(combo);
+    stopRecording();
+    push({ [which]: combo }, true);
   }, true);
 
   function paint() {
@@ -405,6 +477,8 @@
     inputs.glass.checked = state.glass !== false;
     inputs.animate.checked = state.animate !== false;
     inputs.popupOnAnswer.checked = state.popupOnAnswer !== false;
+    inputs.notifyOnAnswer.checked = state.notifyOnAnswer !== false;
+    inputs.notifySound.checked = state.notifySound !== false;
     inputs.blur.checked = state.blur === true;
     inputs.zoom.value = Math.round((state.zoomPanel ?? 1.36) * 100);
     // Ползунок показывает прозрачность: 1 − плотность тона.
@@ -413,15 +487,27 @@
     if (!recording) {
       inputs.hotkey.textContent = prettyHotkey(state.hotkey || DEFAULT.hotkey);
       inputs.hotkey.classList.remove('recording');
+      inputs.focusHotkey.textContent = prettyHotkey(state.focusHotkey || DEFAULT.focusHotkey);
+      inputs.focusHotkey.classList.remove('recording');
+      inputs.launcherDir.value = state.launcherDir || '';
+      inputs.url.value = state.url || '';
     }
-    if (state.hotkeyError) {
-      hint.textContent = state.hotkeyError;
-      hint.classList.add('error');
-    } else if (!recording) {
-      hint.textContent = HOTKEY_HINT;
-      hint.classList.remove('error');
-    }
+    setHotkeyHint('hotkey', state.hotkeyError);
+    setHotkeyHint('focusHotkey', state.focusHotkeyError);
     paint();
+  }
+
+  // Ошибка занятого сочетания показывается вместо подсказки; иначе подсказка возвращается.
+  function setHotkeyHint(which, error) {
+    if (recording && recording.which === which) return;
+    const hintEl = el(`${which}-hint`);
+    if (error) {
+      hintEl.textContent = error;
+      hintEl.classList.add('error');
+    } else {
+      hintEl.textContent = HOTKEY_HINTS[which];
+      hintEl.classList.remove('error');
+    }
   }
 
   // Изменения копятся в один пакет и уходят через короткую паузу: иначе быстрые
@@ -457,6 +543,13 @@
     push({ zoomPanel: Number(inputs.zoom.value) / 100 });
   });
 
+  inputs.launcherDir.addEventListener('change', () => {
+    push({ launcherDir: inputs.launcherDir.value.trim() }, true);
+  });
+  inputs.url.addEventListener('change', () => {
+    push({ url: inputs.url.value.trim() }, true);
+  });
+
   // Кнопки-пресеты: выставляют основной размер текста одним нажатием.
   const presetButtons = Array.from(document.querySelectorAll('.presets button[data-zoom]'));
   function markPreset() {
@@ -487,6 +580,12 @@
   inputs.popupOnAnswer.addEventListener('change', () => {
     push({ popupOnAnswer: inputs.popupOnAnswer.checked }, true);
   });
+  inputs.notifyOnAnswer.addEventListener('change', () => {
+    push({ notifyOnAnswer: inputs.notifyOnAnswer.checked }, true);
+  });
+  inputs.notifySound.addEventListener('change', () => {
+    push({ notifySound: inputs.notifySound.checked }, true);
+  });
   inputs.blur.addEventListener('change', () => {
     push({ blur: inputs.blur.checked }, true);
   });
@@ -516,5 +615,6 @@
 </script>
 </body>
 </html>
+
 
 
