@@ -313,7 +313,12 @@ name and, while the agent is working, the elapsed time. The tray menu offers **S
 If an answer arrives while the window was hidden, the widget pops up and additionally shows a
 **Windows notification** carrying the first lines of the answer — often enough to get the gist at a
 glance. Clicking the notification opens the widget and puts the caret straight into the input
-field. Both the notification and its sound can be turned off with separate switches in the settings.
+field. Both the field. Both the notification and its sound can be turned off with separate switches in the settings.
+
+The widget registers itself in Windows as **“Harness Widget”** — with its own application ID and
+a Start Menu shortcut. That is what makes a click on the notification go to the already running
+widget instead of launching a fresh Electron process: no second window appears, the widget simply
+slides out from the edge.
 
 ## Log and recovery
 
@@ -360,6 +365,7 @@ about it here than to promise a signed installer.
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
 
 
 

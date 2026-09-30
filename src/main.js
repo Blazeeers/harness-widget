@@ -1479,13 +1479,49 @@ async function captureScreenshots(tag = '') {
 
 // ---------------------------------------------------------------- lifecycle
 
+// Имя и идентификатор приложения для Windows. Без них система считает виджет
+// безымянным «Electron»: так он подписан в трее и уведомлениях, и по клику на
+// уведомление Windows запускает новый процесс вместо уже работающего окна.
+const APP_ID = 'com.blazeeers.harnesswidget';
+app.setName('Harness Widget');
+app.setAppUserModelId(APP_ID);
+
+// Ярлык в меню «Пуск» с тем же идентификатором: по нему Windows понимает, какому
+// приложению принадлежит уведомление, и передаёт клик работающему экземпляру.
+function ensureAppShortcut() {
+  if (process.platform !== 'win32') return;
+  try {
+    const dir = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+    fs.mkdirSync(dir, { recursive: true });
+    const link = path.join(dir, 'Harness Widget.lnk');
+    shell.writeShortcutLink(link, 'create', {
+      target: process.execPath,
+      args: app.isPackaged ? [] : [ROOT],
+      cwd: ROOT,
+      description: 'Harness Widget',
+      appUserModelId: APP_ID,
+      icon: path.join(ROOT, 'assets', 'icon.png'),
+      iconIndex: 0,
+    });
+    console.log('[widget] ярлык приложения готов:', link);
+  } catch (err) {
+    console.error('[widget] ярлык приложения:', err.message);
+  }
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => showWindow());
+  // Второй запуск (в том числе клик по уведомлению) не создаёт новое окно,
+  // а показывает уже работающее.
+  app.on('second-instance', () => {
+    console.log('[widget] повторный запуск — показываю существующее окно');
+    focusComposer();
+  });
 
   app.whenReady().then(async () => {
     mirrorConsoleToFile();
+    ensureAppShortcut();
     loadWindowState();
     createWindow();
     createTray();
@@ -1682,6 +1718,7 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
 
 
 
