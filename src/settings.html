@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Настройки</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1b1e26;
+    --fg: #e8eaf0;
+    --dim: #8b91a1;
+    --border: #272b36;
+    --accent: #5b8cff;
+    --track: #2b3040;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --fg: #1b1e26;
+      --dim: #6b7280;
+      --border: #e0e3e9;
+      --track: #e6e9ef;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 12px/1.4 "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 8px 8px 14px;
+    border-bottom: 1px solid var(--border);
+    flex: none;
+  }
+  header h1 { font-size: 12px; font-weight: 600; margin: 0; flex: 1; letter-spacing: 0.2px; }
+  header button {
+    width: 26px; height: 22px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--fg); cursor: pointer;
+    display: grid; place-items: center; font-size: 13px;
+  }
+  header button:hover { background: rgba(127, 127, 127, 0.15); }
+  main { flex: 1; overflow-y: auto; padding: 12px 14px 16px; }
+  h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--dim); margin: 0 0 10px; font-weight: 600;
+  }
+  .group {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .field-name { flex: 1; font-size: 12px; }
+  .field-value { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .hint { color: var(--dim); font-size: 11px; margin-top: 4px; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--track); outline: none; margin: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    border: 2px solid var(--panel);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex: none; }
+  .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .switch span {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: var(--track); transition: background 0.15s;
+  }
+  .switch span::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #fff;
+    transition: transform 0.15s;
+  }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(16px); }
+  .switch input:focus-visible + span { box-shadow: 0 0 0 2px var(--accent); }
+
+  .keycap {
+    font: inherit; font-weight: 600; letter-spacing: 0.3px;
+    padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--fg);
+    min-width: 96px; text-align: center;
+  }
+  .keycap:hover { border-color: var(--accent); color: var(--accent); }
+  .keycap.recording {
+    border-color: var(--accent); color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .hint.error { color: #ef5f5f; }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .presets button {
+    font: inherit; font-size: 11px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer;
+  }
+  .presets button:hover { border-color: var(--accent); color: var(--accent); }
+  .presets button.active {
+    border-color: var(--accent); color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  footer {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-top: 1px solid var(--border);
+    color: var(--dim); font-size: 11px;
+  }
+  footer span { flex: 1; }
+  footer button {
+    font: inherit; padding: 5px 12px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--fg);
+  }
+  footer button:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Настройки</h1>
+    <button id="close" title="Закрыть (Esc)">✕</button>
+  </header>
+
+  <main>
+    <h2>Интерфейс</h2>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Ширина панели</span>
+          <span class="field-value" id="width-value">440 px</span>
+        </div>
+        <input type="range" id="width" min="320" max="900" step="10" />
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Высота панели</span>
+          <span class="field-value" id="height-value">33 %</span>
+        </div>
+        <input type="range" id="height" min="15" max="100" step="1" />
+        <div class="hint">Доля от высоты рабочего стола. Панель остаётся у правого края.</div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Стеклянный фон</span>
+          <label class="switch"><input type="checkbox" id="glass" /><span></span></label>
+        </div>
+        <div class="hint">Размытый задник окна: видно то, что находится позади виджета.
+          Требует включённых эффектов прозрачности в Windows.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Размытие фона</span>
+          <label class="switch"><input type="checkbox" id="blur" /><span></span></label>
+        </div>
+        <div class="hint">Размывает то, что за окном (системный Acrylic). Он добавляет свою
+          тёмную подложку, поэтому выключенное размытие выглядит прозрачнее.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Прозрачность фона</span>
+          <span class="field-value" id="glassAlpha-value">45 %</span>
+        </div>
+        <input type="range" id="glassAlpha" min="0" max="85" step="5" />
+        <div class="hint">Чем выше, тем сильнее виден размытый задник и тем стекляннее панель.
+          На 0 % панель полностью залита цветом.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Прозрачность карточек</span>
+          <span class="field-value" id="cardAlpha-value">30 %</span>
+        </div>
+        <input type="range" id="cardAlpha" min="0" max="85" step="5" />
+        <div class="hint">Поле ввода и карточки сообщений в переписке. Они всегда плотнее
+          фона, чтобы текст оставался читаемым; код и поля ввода не прозрачнеют.</div>
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Положение окна</span>
+          <button class="keycap" id="resetBounds">Вернуть на место</button>
+        </div>
+        <div class="hint">Виджет запоминает положение и размер, которые ты задал мышью.
+          Эта кнопка возвращает его к правому краю экрана.</div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Анимация появления</span>
+          <label class="switch"><input type="checkbox" id="animate" /><span></span></label>
+        </div>
+        <div class="hint">Окно выезжает из-за правого края и уезжает обратно.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Горячая клавиша</span>
+          <button class="keycap" id="hotkey" title="Нажми, чтобы записать сочетание">Ctrl+Alt+H</button>
+        </div>
+        <div class="hint" id="hotkey-hint">Открывает и скрывает виджет из любого места.
+          Нажми на сочетание, затем нажми новое. Esc — отмена, Backspace — вернуть по умолчанию.</div>
+      </div>
+    </div>
+
+    <h2>Шрифт</h2>
+
+    <div class="group">
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Размер текста</span>
+          <span class="field-value" id="zoom-value">136 %</span>
+        </div>
+        <input type="range" id="zoom" min="60" max="220" step="2" />
+        <div class="hint">Основной размер: переписка, поле ввода, кнопки. Ниже — отдельные
+          поправки для меню и диалога выбора модели.</div>
+        <div class="presets">
+          <button type="button" data-zoom="1.05">Мелкий</button>
+          <button type="button" data-zoom="1.36">Обычный</button>
+          <button type="button" data-zoom="1.75">Крупный</button>
+          <button type="button" data-zoom="2.1">Очень крупный</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Шрифт в меню</span>
+          <span class="field-value" id="menu-value">100 %</span>
+        </div>
+        <input type="range" id="menu" min="50" max="300" step="5" />
+        <div class="hint">Меню сессий, которое открывается по логотипу слева вверху.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-head">
+          <span class="field-name">Шрифт в диалоге выбора модели</span>
+          <span class="field-value" id="model-value">100 %</span>
+        </div>
+        <input type="range" id="model" min="50" max="300" step="5" />
+        <div class="hint">Всплывающее меню модели и режима рассуждений.</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span>Изменения применяются сразу — низ панели открыт для сравнения</span>
+    <button id="reset">Сбросить</button>
+  </footer>
+
+<script>
+  const el = (id) => document.getElementById(id);
+  const inputs = {
+    width: el('width'),
+    height: el('height'),
+    menu: el('menu'),
+    model: el('model'),
+    glass: el('glass'),
+    glassAlpha: el('glassAlpha'),
+    cardAlpha: el('cardAlpha'),
+    hotkey: el('hotkey'),
+    animate: el('animate'),
+    blur: el('blur'),
+    zoom: el('zoom'),
+  };
+
+  const DEFAULT = {
+    panelWidth: 440,
+    panelHeightRatio: 0.3333,
+    menuScale: 1,
+    modelScale: 1,
+    zoomPanel: 1.36,
+    glass: true,
+    glassAlpha: 0.55,
+    cardAlpha: 0.7,
+    hotkey: 'Control+Alt+H',
+    animate: true,
+    blur: false,
+  };
+
+  const hint = el('hotkey-hint');
+  const HOTKEY_HINT = hint.textContent;
+  let recording = false;
+  let lastState = {};
+
+  // Electron принимает сочетания вида «Control+Alt+H», показываем привычнее.
+  function prettyHotkey(accelerator) {
+    return String(accelerator || '')
+      .replace(/CommandOrControl|CmdOrCtrl|Control/g, 'Ctrl')
+      .replace(/Command|Super|Meta/g, 'Win')
+      .replace(/\+/g, ' + ');
+  }
+
+  const KEY_NAMES = {
+    ' ': 'Space',
+    ArrowUp: 'Up',
+    ArrowDown: 'Down',
+    ArrowLeft: 'Left',
+    ArrowRight: 'Right',
+    Enter: 'Return',
+  };
+
+  // Из нажатия собираем сочетание в формате Electron. Без модификатора
+  // пропускаем только функциональные клавиши — иначе перехватим обычный ввод.
+  function toAccelerator(event) {
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return null;
+    const modifiers = [];
+    if (event.ctrlKey) modifiers.push('Control');
+    if (event.altKey) modifiers.push('Alt');
+    if (event.shiftKey) modifiers.push('Shift');
+    if (event.metaKey) modifiers.push('Super');
+
+    let name = KEY_NAMES[event.key] || event.key;
+    if (/^[a-z]$/i.test(name)) name = name.toUpperCase();
+    if (!/^F([1-9]|1[0-9]|2[0-4])$/.test(name) && modifiers.length === 0) return null;
+    return [...modifiers, name].join('+');
+  }
+
+  inputs.hotkey.addEventListener('click', () => {
+    recording = true;
+    inputs.hotkey.classList.add('recording');
+    inputs.hotkey.textContent = 'Нажми сочетание…';
+    hint.textContent = 'Нажми новое сочетание. Esc — отмена, Backspace — вернуть по умолчанию.';
+    hint.classList.remove('error');
+  });
+
+  // Слушаем в фазе перехвата, чтобы Esc отменял запись, а не закрывал настройки.
+  window.addEventListener('keydown', (event) => {
+    if (!recording) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Escape') {
+      recording = false;
+      render(lastState);
+      return;
+    }
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      recording = false;
+      inputs.hotkey.textContent = prettyHotkey(DEFAULT.hotkey);
+      push({ hotkey: DEFAULT.hotkey }, true);
+      return;
+    }
+    const combo = toAccelerator(event);
+    if (!combo) return;
+    recording = false;
+    inputs.hotkey.textContent = prettyHotkey(combo);
+    push({ hotkey: combo }, true);
+  }, true);
+
+  function paint() {
+    el('width-value').textContent = inputs.width.value + ' px';
+    el('height-value').textContent = inputs.height.value + ' %';
+    el('zoom-value').textContent = inputs.zoom.value + ' %';
+    el('menu-value').textContent = inputs.menu.value + ' %';
+    el('model-value').textContent = inputs.model.value + ' %';
+    markPreset();
+    el('glassAlpha-value').textContent = inputs.glassAlpha.value + ' %';
+    el('cardAlpha-value').textContent = inputs.cardAlpha.value + ' %';
+    inputs.glassAlpha.disabled = !inputs.glass.checked;
+    inputs.glassAlpha.style.opacity = inputs.glass.checked ? '1' : '0.4';
+    inputs.cardAlpha.disabled = !inputs.glass.checked;
+    inputs.cardAlpha.style.opacity = inputs.glass.checked ? '1' : '0.4';
+  }
+
+  function render(state) {
+    lastState = state || {};
+    inputs.width.value = state.panelWidth;
+    inputs.height.value = Math.round(state.panelHeightRatio * 100);
+    inputs.menu.value = Math.round((state.menuScale ?? 1) * 100);
+    inputs.model.value = Math.round((state.modelScale ?? 1) * 100);
+    inputs.glass.checked = state.glass !== false;
+    inputs.animate.checked = state.animate !== false;
+    inputs.blur.checked = state.blur === true;
+    inputs.zoom.value = Math.round((state.zoomPanel ?? 1.36) * 100);
+    // Ползунок показывает прозрачность: 1 − плотность тона.
+    inputs.glassAlpha.value = Math.round((1 - (state.glassAlpha ?? 0.55)) * 100);
+    inputs.cardAlpha.value = Math.round((1 - (state.cardAlpha ?? 0.7)) * 100);
+    if (!recording) {
+      inputs.hotkey.textContent = prettyHotkey(state.hotkey || DEFAULT.hotkey);
+      inputs.hotkey.classList.remove('recording');
+    }
+    if (state.hotkeyError) {
+      hint.textContent = state.hotkeyError;
+      hint.classList.add('error');
+    } else if (!recording) {
+      hint.textContent = HOTKEY_HINT;
+      hint.classList.remove('error');
+    }
+    paint();
+  }
+
+  // Изменения копятся в один пакет и уходят через короткую паузу: иначе быстрые
+  // правки разных ползунков перетирали друг друга общим таймером.
+  let pending = {};
+  let timer = null;
+  function push(patch, immediate = false) {
+    Object.assign(pending, patch);
+    clearTimeout(timer);
+    const send = () => {
+      const payload = pending;
+      pending = {};
+      window.settings.set(payload);
+    };
+    if (immediate) send();
+    else timer = setTimeout(send, 60);
+  }
+
+  inputs.width.addEventListener('input', () => {
+    paint();
+    push({ panelWidth: Number(inputs.width.value) });
+  });
+  inputs.height.addEventListener('input', () => {
+    paint();
+    push({ panelHeightRatio: Number(inputs.height.value) / 100 });
+  });
+  inputs.menu.addEventListener('input', () => {
+    paint();
+    push({ menuScale: Number(inputs.menu.value) / 100 });
+  });
+  inputs.zoom.addEventListener('input', () => {
+    paint();
+    push({ zoomPanel: Number(inputs.zoom.value) / 100 });
+  });
+
+  // Кнопки-пресеты: выставляют основной размер текста одним нажатием.
+  const presetButtons = Array.from(document.querySelectorAll('.presets button[data-zoom]'));
+  function markPreset() {
+    for (const button of presetButtons) {
+      const value = Math.round(Number(button.dataset.zoom) * 100);
+      button.classList.toggle('active', Math.abs(value - Number(inputs.zoom.value)) < 2);
+    }
+  }
+  for (const button of presetButtons) {
+    button.addEventListener('click', () => {
+      inputs.zoom.value = Math.round(Number(button.dataset.zoom) * 100);
+      paint();
+      // Отправляем то, что реально стоит на шкале: она округляет до своего шага.
+      push({ zoomPanel: Number(inputs.zoom.value) / 100 }, true);
+    });
+  }
+  inputs.model.addEventListener('input', () => {
+    paint();
+    push({ modelScale: Number(inputs.model.value) / 100 });
+  });
+  inputs.glass.addEventListener('change', () => {
+    paint();
+    push({ glass: inputs.glass.checked }, true);
+  });
+  inputs.animate.addEventListener('change', () => {
+    push({ animate: inputs.animate.checked }, true);
+  });
+  inputs.blur.addEventListener('change', () => {
+    push({ blur: inputs.blur.checked }, true);
+  });
+  el('resetBounds').addEventListener('click', () => {
+    push({ resetBounds: true }, true);
+  });
+  inputs.glassAlpha.addEventListener('input', () => {
+    paint();
+    push({ glassAlpha: 1 - Number(inputs.glassAlpha.value) / 100 });
+  });
+  inputs.cardAlpha.addEventListener('input', () => {
+    paint();
+    push({ cardAlpha: 1 - Number(inputs.cardAlpha.value) / 100 });
+  });
+
+  el('reset').addEventListener('click', () => {
+    render(DEFAULT);
+    push({ ...DEFAULT }, true);
+  });
+  el('close').addEventListener('click', () => window.settings.close());
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') window.settings.close();
+  });
+
+  window.settings.onState(render);
+  window.settings.get().then(render);
+</script>
+</body>
+</html>
+

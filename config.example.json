@@ -1,0 +1,17 @@
+{
+  "launcherDir": "",
+  "url": "",
+  "hotkey": "Control+Alt+H",
+  "panelWidth": 510,
+  "panelHeightRatio": 0.49,
+  "zoomPanel": 1,
+  "zoomWindow": 1,
+  "menuScale": 0.9,
+  "modelScale": 0.9,
+  "alwaysOnTop": true,
+  "glass": true,
+  "glassAlpha": 0.06,
+  "cardAlpha": 0.14,
+  "animate": true,
+  "blur": false
+}

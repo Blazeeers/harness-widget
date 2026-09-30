@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Harness недоступен</title>
+<style>
+  :root { --bg: #12141a; --fg: #e6e8ee; --dim: #8a90a0; --accent: #5b8cff; --border: #262a35; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fff; --fg: #1c1f26; --dim: #6b7280; --border: #e2e5ea; }
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: grid; place-items: center; text-align: center; padding: 24px;
+  }
+  .box { max-width: 320px; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  p { color: var(--dim); margin: 0 0 18px; word-break: break-word; }
+  button {
+    font: inherit; font-weight: 600;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--fg);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; gap: 8px; justify-content: center; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Харнесс не отвечает</h1>
+    <p id="why">Сервер на 127.0.0.1 не запущен или ещё поднимается.</p>
+    <div class="row">
+      <button class="primary" id="start">Запустить</button>
+      <button id="retry">Повторить</button>
+    </div>
+  </div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const message = params.get('message');
+  if (message) document.getElementById('why').textContent = message;
+  document.getElementById('start').addEventListener('click', () => window.dshWidget.action('start-harness'));
+  document.getElementById('retry').addEventListener('click', () => window.dshWidget.action('reload'));
+</script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+/*
+ * Косметика поверх интерфейса харнесса — применяется только к странице виджета.
+ * Браузера и самого харнесса не касается.
+ *
+ * Селекторы построены на суффиксах CSS-модулей (`<hash>_composerSeat`), поэтому
+ * переживают пересборку фронтенда: хеш меняется, суффикс — нет.
+ * Состояние сайдбара различается маркером `_collapsed` на его корне.
+ */
+
+/* ── Панель настроек харнесса ──────────────────────────────────────────────
+   Штатно это две колонки: список разделов слева и содержимое справа, и рассчитана
+   она на широкое окно. Компактная панель виджета уже, поэтому панель настроек
+   получает натуральный размер: масштаб компенсируется в dynamic CSS, где известен
+   текущий масштаб страницы. Здесь остаётся только чуть более плотный список
+   разделов, чтобы подписи не переносились. */
+@media (max-width: 900px) {
+  [class*="_panel"]:has([class*="_navTitle"]) [class*="_navCell"] {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+  [class*="_panel"]:has([class*="_navTitle"]) [class*="_options"] {
+    padding: 0 18px 18px !important;
+  }
+}
+
+/* ── Стеклянный фон ───────────────────────────────────────────────────────
+   Окно прозрачное, а за ним DWM рисует размытый задник (Acrylic). Тон поверх
+   стекла задаёт body — его плотность регулируется ползунком в настройках.
+   Крупные поверхности оболочки делает прозрачными src/widget.js. */
+html {
+  background: transparent !important;
+}
+body {
+  background-color: rgba(21, 21, 23, var(--widget-glass-alpha, 1)) !important;
+}
+
+/* ── Карточки переписки: полупрозрачные сразу ─────────────────────────────
+   Раньше это делал скрипт с задержкой, и карточка успевала мелькнуть
+   непрозрачной. Теперь плотность задана в CSS и применяется при отрисовке,
+   без задержки и мигания.
+
+   Правила ограничены лентой переписки — единственным местом, которое должно
+   пропускать стекло. Всё остальное (меню, подсказки, шапки, диалоги) остаётся
+   плотным по умолчанию: так ни одно всплывающее окно не станет прозрачным,
+   как бы харнесс его ни рисовал. */
+[class*="_scrollBody"] [class*="_card"]:not([data-widget-opaque-bg]):not([data-widget-opaque]):not([data-widget-opaque] *):not([class*="_composerSeat"] [class*="_card"]):not([class*="code"]):not([class*="editor"]):not(:has([class*="_promptDiff"])) {
+  background-color: color-mix(in srgb,
+    var(--dsw-static-neutral-bluish-875) var(--widget-card-percent, 100%), transparent) !important;
+}
+[class*="_scrollBody"] [class*="_bubble"]:not([data-widget-opaque-bg]):not([data-widget-opaque] *):not([class*="code"]) {
+  background-color: color-mix(in srgb,
+    var(--dsw-static-neutral-bluish-850) var(--widget-card-percent, 100%), transparent) !important;
+}
+[class*="_scrollBody"] [class*="_header"]:not([data-widget-opaque-bg]):not([data-widget-opaque] *):not([class*="code"]) {
+  background-color: color-mix(in srgb,
+    var(--dsw-static-neutral-850) var(--widget-card-percent, 100%), transparent) !important;
+}
+
+/* Скрытый элемент: помечается скриптом, когда он перекрыт другим слоем. */
+[data-widget-hidden] {
+  display: none !important;
+}
+
+/* Открытая боковая панель: поднимаем её выше переписки, чтобы содержимое чата
+   не просвечивало полосой над панелью. */
+[data-widget-panel] {
+  position: relative;
+  z-index: 60;
+}
+[data-widget-panel][data-widget-opaque-bg] {
+  background-color: var(--dsw-alias-bg-layer-1, #1f1f21) !important;
+}
+
+/* ── Всплывающие слои: плотный фон ────────────────────────────────────────
+   Скрипт помечает всплывающие слои и их фоновые подложки. У харнесса фон
+   «материала» полупрозрачный, из-за чего сквозь меню и подсказки видно
+   переписку — делаем его плотным. */
+[data-widget-opaque-bg] {
+  background-color: var(--dsw-alias-bg-layer-2, #2c2c2e) !important;
+}
+/* Скрипт помечает всплывающие слои атрибутом data-widget-opaque; правило выше
+   должно побеждать правила прозрачности, поэтому дублируем его с большим весом. */
+html body [data-widget-opaque-bg][data-widget-opaque-bg] {
+  background-color: var(--dsw-alias-bg-layer-2, #2c2c2e) !important;
+}
+
+/* ── Всплывающая карточка с правками ──────────────────────────────────────
+   Штатная ширина 244px не вмещает дифф: строки кода режутся, читать невозможно.
+   Отдаём карточке всю ширину окна и прижимаем к левому краю — иначе, расширившись,
+   она уезжает за границу панели. Фон плотный: правки нужно читать. */
+[class*="_card"]:has([class*="_promptDiff"]) {
+  left: 8px !important;
+  width: calc(100vw - 16px) !important;
+  max-width: calc(100vw - 16px) !important;
+  min-width: 0 !important;
+  max-height: calc(100vh - 16px) !important;
+  background-color: var(--dsw-hovercard-bg, #2c2c2e) !important;
+}
+
+/* Дифф внутри карточки: мельче и плотнее, чтобы строки помещались целиком. */
+[class*="_promptDiff"] {
+  font-size: 10px !important;
+  line-height: 15px !important;
+}
+
+/* Карточка ввода — тоже стекло, но плотнее фона: текст в поле должен читаться.
+   Плотность задаёт отдельный ползунок «Прозрачность карточек». */
+[class*="_composerSeat"] [class*="_card"] {
+  background-color: rgba(44, 44, 46, var(--widget-card-alpha, 1)) !important;
+}
+
+/* ── Пустая сессия: убрать декоративную шапку ─────────────────────────────
+   Крупный логотип «Into the Unknown» и строка режимов занимают больше
+   половины панели, из-за чего при увеличенном масштабе карточка ввода
+   не помещается. Логотип и так есть слева вверху, а режимы — в меню сессий. */
+[class*="_composerStack"] > [class*="_root"]:not([class*="_hero"]),
+[class*="_heroWorkspaceRow"] {
+  display: none !important;
+}
+
+/* ── Значок модели и режима рассуждений ───────────────────────────────────
+   Стоковая иконка чипа ничего не сообщает, а подпись занимает место. Вместо них
+   рисуем компактный значок: код модели и буква режима в цветном кружке.
+   Значения подставляет src/widget.js, читая скрытые подписи харнесса, поэтому
+   значок меняется вместе с выбранной моделью. Полное название по-прежнему
+   в подсказке при наведении. */
+[class*="_standardControls"] [class*="_triggerIcon"] {
+  display: none !important;
+}
+[class*="_standardControls"] [class*="_triggerLabel"],
+[class*="_standardControls"] [class*="_triggerEffort"] {
+  display: none !important;
+}
+
+/* Тянем чип к габаритам соседней иконки доступа: та же высота 28px, но уже
+   и легче — приглушённый текст и тонкий контур вместо заливки. */
+[class*="_standardControls"] button {
+  gap: 3px !important;
+  padding-left: 6px !important;
+  padding-right: 4px !important;
+}
+
+[class*="_standardControls"] button::before {
+  content: attr(data-model-short);
+  order: 0;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  opacity: 0.72;
+}
+/* Кружок режима — тонким контуром, как соседние иконки в строке, а не заливкой. */
+[class*="_standardControls"] button::after {
+  content: attr(data-effort-letter);
+  order: 1;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--widget-effort, #8b91a1);
+}
+[class*="_standardControls"] button[data-effort-key="low"] { --widget-effort: #7fa7ff; }
+[class*="_standardControls"] button[data-effort-key="medium"] { --widget-effort: #f0b45c; }
+[class*="_standardControls"] button[data-effort-key="high"] { --widget-effort: #f2a08b; }
+[class*="_standardControls"] button[data-effort-key="max"] { --widget-effort: #ef5f5f; }
+[class*="_standardControls"] [class*="_chevron"] {
+  order: 2;
+}
+
+/* ── Нижняя строка composer: выбор модели направо ─────────────────────────
+   При крупном масштабе строка перестаёт вмещать все элементы, и харнесс
+   сворачивает выбор модели в безымянную иконку. Разрешаем перенос: группа с
+   моделью и кнопкой отправки уезжает на отдельную строку и прижимается вправо. */
+[class*="_composerSeat"] [class*="_row"] {
+  flex-wrap: wrap !important;
+  row-gap: 6px;
+}
+[class*="_composerSeat"] [class*="_trailing"] {
+  margin-left: auto !important;
+  gap: 4px !important;
+}
+
+/* ── Отступ под карточкой ввода ───────────────────────────────────────────
+   Карточка стоит вплотную к низу панели. Поднимаем её так, чтобы нижний отступ
+   был ровно в 1,5 раза меньше бокового: боковой у карточки — 16,62px (замерено),
+   значит нижний — 11,08px. Заодно это забирает запас у нижних отступов, из-за
+   которых при крупном масштабе низ карточки обрезался. */
+[class*="_scrollBody"] {
+  padding-bottom: 11.08px !important;
+}
+[class*="_composerSeat"] {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+[class*="_composerStack"] {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* ── Убрать подсказку из поля ввода ───────────────────────────────────────
+   Плейсхолдер — отдельный слой поверх поля ввода; убираем его целиком. */
+[class*="_placeholder"] {
+  display: none !important;
+}
+
+/* ── Компактное поле ввода, растущее под текст ────────────────────────────
+   У поля ввода минимальная высота 52px, из-за чего пустая карточка выглядит
+   высокой. Одна строка занимает 4px отступа + 24px строки = 28px — ставим это
+   минимумом. Растёт поле само: у него нет ограничения сверху, а контейнер
+   прокручивается после 336px. */
+[class*="_input"] {
+  min-height: 28px !important;
+}
+
+/* ── Поле ввода на всю ширину панели, ровно по центру ─────────────────────
+   После сжатия рейки у поля остаётся справа запас: 2px внешнего отступа тела
+   и полоса прокрутки. Из-за них блок ввода смещён влево от центра панели.
+   Полоса прокрутки при этом не нужна — панель узкая, прокрутка работает
+   колесом и трекпадом. */
+[class*="_body"] {
+  margin-right: 0 !important;
+}
+[class*="_scrollBody"] {
+  margin-right: 0 !important;
+  scrollbar-width: none;
+}
+
+/* ── Поле ввода прижать к нижнему краю панели ─────────────────────────────
+   Ввод лежит в `_composerSeat` внутри `_scrollBody`, который центрирует
+   содержимое по вертикали. `margin-top: auto` забирает свободное место сверху
+   и прижимает блок к низу, не ломая раскладку при длинной переписке. */
+[class*="_composerSeat"] {
+  margin-top: auto !important;
+}
+
+/* ── Шапка чата ───────────────────────────────────────────────────────────
+   Логотип нарисован поверх содержимого, поэтому название сессии начинается под
+   ним. Поднимаем логотип к уровню строки, отодвигаем название правее и делаем
+   его мельче, чтобы оно не наезжало на значок и не спорило с кнопками.
+   Скругления кнопок шапки приводим к общему виду — у пары из них был радиус 0. */
+[class*="_sidebarCol"] [class*="_collapsed"] {
+  top: -10px !important;
+}
+/* Шапка переписки тоже пропускает фон: панель должна читаться как стекло,
+   висящее над приложением, а не как плотная плита сверху. */
+[class*="_header"]:has([class*="_titleRow"]) {
+  background-color: transparent !important;
+}
+[class*="_titleRow"] [class*="_crumbCurrent"] {
+  margin-left: 38px !important;
+  font-size: 12px !important;
+  /* Ограничение есть, но с запасом: место освобождает счётчик задач ниже. */
+  max-width: 220px !important;
+}
+/* Счётчик фоновых задач прижимаем к правому краю кластера, к пиктограмме папки:
+   иначе между ними остаётся пустота, а название сессии обрезается раньше времени. */
+[class*="_titleRow"] [class*="_titleCluster"] > *:has([class*="_count"]) {
+  margin-left: auto !important;
+}
+[class*="_titleRow"] button,
+[class*="_titleRow"] [class*="_main"],
+[class*="_titleRow"] [class*="_chevron"] {
+  border-radius: 8px !important;
+}
+
+/* ── Место под логотип в левом верхнем углу ───────────────────────────────
+   Логотип нарисован поверх содержимого, поэтому вверху нужно оставить полосу,
+   иначе он наезжает на заголовки страниц и на начало переписки. */
+[class*="_scrollBody"] {
+  padding-top: 44px !important;
+}
+/* У страницы первым идёт контейнер нулевой высоты, поэтому отступ ставим самой
+   колонке: он сдвигает всё её содержимое вниз. */
+[class*="_centerCol"]:not(:has([class*="_composerSeat"])) {
+  padding-top: 44px !important;
+}
+
+/* Сетка кадра резервирует дорожку под меню (56px), хотя колонка уже нулевой
+   ширины. Обнуляем только первую дорожку: вторая — содержимое, третья отдана
+   правой панели и остаётся автоматом, как у харнесса. */
+[class*="_frame"]:has([class*="_sidebarCol"]) {
+  grid-template-columns: 0px 1fr auto !important;
+}
+
+/* ── Левая панель: и рейка, и меню — наложением ───────────────────────────
+   Колонка меню не занимает места: её ширина обнулена, а содержимое рисуется
+   поверх страницы — свёрнутая рейка с логотипом и развёрнутое меню как
+   выдвижная панель. Содержимое всегда получает полную ширину.
+
+   Важно: колонка остаётся в потоке сетки, просто нулевой ширины. Если вывести
+   её из потока (position: absolute), сетка сдвинет остальные колонки на её
+   место — содержимое уедет в узкий трек, а правая панель займёт широкий. */
+[class*="_sidebarCol"] {
+  width: 0 !important;
+  min-width: 0 !important;
+  position: relative;
+  z-index: 40;
+  overflow: visible !important;
+}
+
+/* Содержимое колонки — наложение во всю высоту окна. */
+[class*="_sidebarCol"] > * > * {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 280px !important;
+  height: 100% !important;
+}
+
+/* Свёрнутая рейка: только логотип, без фона панели и без перехвата мыши. */
+[class*="_sidebarCol"] [class*="_collapsed"] {
+  width: 56px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  /* Рейка — только визуальное наложение. Без этого невидимая полоса шириной
+     56px перехватывает мышь по всей высоте панели и съедает клики по содержимому:
+     у кнопки «плюс» работала только правая часть. */
+  pointer-events: none !important;
+}
+
+/* Кликабельной остаётся только кнопка с логотипом. */
+[class*="_sidebarCol"] [class*="_collapsed"] [class*="_toggle"] {
+  pointer-events: auto !important;
+}
+
+/* В свёрнутой рейке остаётся только та ветка, где лежит кнопка с логотипом:
+   иконки разделов и настройки убираем. */
+[class*="_sidebarCol"] [class*="_collapsed"] > *:not(:has([class*="_toggle"])) {
+  display: none !important;
+}
+
+/* Развёрнутое меню отделяем тенью от содержимого под ним. */
+[class*="_sidebarCol"] [class*="_root"]:not([class*="_collapsed"]) {
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
+}
+
+

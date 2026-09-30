@@ -1,0 +1,24 @@
+{
+  "name": "harness-widget",
+  "version": "0.1.0",
+  "description": "Compact always-on-top Windows widget for an already-running DeepSeek Harness web host",
+  "main": "src/main.js",
+  "license": "MIT",
+  "author": "Blazeeers",
+  "keywords": [
+    "electron",
+    "widget",
+    "windows",
+    "deepseek",
+    "harness",
+    "desktop"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "shot": "electron . --screenshot",
+    "icon": "node tools/make-icon.js"
+  },
+  "devDependencies": {
+    "electron": "44.5.1"
+  }
+}

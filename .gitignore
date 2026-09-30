@@ -1,0 +1,23 @@
+# Зависимости
+node_modules/
+package-lock.json
+
+# Личные настройки и состояние: у каждого свои пути и хоткей
+config.json
+config.backup.json
+*.local.json
+
+# Снимки экрана и вывод отладочных прогонов
+shots/
+
+# Отладочные скрипты разбора страницы (не часть виджета)
+tools/probe-*.js
+tools/glass-*.ps1
+tools/bright-backdrop.ps1
+tools/settings-*.js
+tools/preview-diff-popup.js
+
+# Служебное
+Thumbs.db
+desktop.ini
+*.log
