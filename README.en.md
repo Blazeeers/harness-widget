@@ -283,9 +283,13 @@ third-party graphics files in the repository.
 
 ## Popping up on an agent answer
 
-While the agent is working, the send button is labelled “Queue message” and the transcript shows
-a running marker. When the answer is ready, the widget catches that transition and, if the window
-is hidden in the tray, slides it out on its own — you can do something else and never check by hand.
+The widget pops up **only when the whole turn is finished**, not on every pause between steps.
+The signal is the “N turns” counter in the statistics row under the conversation: it grows when the
+agent completes a turn and is not affected by transcript virtualisation. While the agent is thinking
+or calling tools the window stays hidden — otherwise it would pop up several times per answer.
+
+If that counter is missing from the markup there is a fallback: a minute of silence with the send
+button back also counts as a finished turn.
 
 It works together with autostart: the widget starts hidden, waits in the tray and appears the
 moment the agent finishes, or on the global hotkey.
@@ -356,6 +360,7 @@ about it here than to promise a signed installer.
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
 
 
 

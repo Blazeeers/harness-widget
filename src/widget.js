@@ -275,10 +275,21 @@
     if (found.length) window.dshWidget.report(found);
   }
 
-  // Всплытие при ответе агента. Пока агент работает, кнопка отправки называется
-  // «Queue message», а в ленте есть маркер «running»; когда ответ готов, всё это
-  // исчезает. Ловим именно переход «работал → готово» и просим окно показаться.
-  let wasBusy = null;
+  // Всплытие только по финальному ответу. Признак завершённого хода — счётчик
+  // «N turns» в строке статистики под перепиской: он увеличивается, когда агент
+  // закончил ход целиком, и не сбивается виртуализацией ленты. Просто «перестал
+  // работать» недостаточно — агент молчит и между шагами.
+  let turnsDone = null;
+  let pendingAnswer = false;
+  let pendingSince = 0;
+
+  function completedTurns() {
+    const pill = Array.from(document.querySelectorAll('[class*="_pill"]'))
+      .find((el) => /\d+\s*turns?/i.test(el.innerText || ''));
+    if (!pill) return null;
+    const match = /(\d+)\s*turns?/i.exec(pill.innerText || '');
+    return match ? Number(match[1]) : null;
+  }
 
   function agentBusy() {
     const primary = document.querySelector('[class*="_composerSeat"] [class*="_primary"]');
@@ -299,20 +310,38 @@
 
   function watchAnswer() {
     const busy = agentBusy();
-    if (wasBusy === null) {
-      wasBusy = busy;
+    const turns = completedTurns();
+    if (turnsDone === null && turns !== null) turnsDone = turns;
+
+    if (busy) {
+      if (!pendingAnswer) {
+        pendingAnswer = true;
+        pendingSince = Date.now();
+        // Запоминаем, сколько ходов было завершено к началу работы.
+        if (turns !== null) turnsDone = turns;
+        if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'busy' });
+        else window.dshWidget?.action('agent-busy');
+      }
       return;
     }
-    if (!wasBusy && busy) {
-      if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'busy' });
-      else window.dshWidget?.action('agent-busy');
+
+    if (!pendingAnswer) {
+      if (turns !== null) turnsDone = turns;
+      return;
     }
-    if (wasBusy && !busy) {
-      const text = lastAnswerText();
-      if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'answer', text });
-      else window.dshWidget?.action('agent-answer');
-    }
-    wasBusy = busy;
+
+    // Ход завершён, если счётчик ходов вырос.
+    const finished = turns !== null && turnsDone !== null && turns > turnsDone;
+    // Подстраховка: агент молчит уже минуту и кнопка снова «отправить» — считаем,
+    // что ход закончился, даже если счётчика в разметке не оказалось.
+    const quiet = Date.now() - pendingSince > 60000;
+    if (!finished && !quiet) return;
+
+    pendingAnswer = false;
+    if (turns !== null) turnsDone = turns;
+    const text = lastAnswerText();
+    if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'answer', text });
+    else window.dshWidget?.action('agent-answer');
   }
 
   const start = () => {

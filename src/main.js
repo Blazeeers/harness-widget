@@ -1077,6 +1077,7 @@ function buildTrayMenu() {
 function createTray() {
   tray = new Tray(trayIcon('idle'));
   updateTrayState();
+  console.log('[widget] значок в трее создан:', JSON.stringify({ tip: tray ? 'да' : 'нет' }));
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', toggleWindow);
 }
@@ -1681,6 +1682,7 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
 
 
 
