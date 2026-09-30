@@ -302,12 +302,23 @@ The tray icon shows the agent state without opening the window:
 | With an amber dot | The agent is working on an answer |
 | With a green dot | The answer is ready and waiting |
 
-Once the window gets focus, the green dot turns back to plain.
+Once the window gets focus, the green dot turns back to plain. The tooltip carries the session
+name and, while the agent is working, the elapsed time. The tray menu offers **Stop the agent**
+(enabled only while it works), **Settings** and **Open log**.
 
 If an answer arrives while the window was hidden, the widget pops up and additionally shows a
-**Windows notification** in the corner of the screen. That covers the case where popping up cannot
-be noticed — a fullscreen game, for instance. Clicking the notification opens the widget. Both the
-notification and its sound can be turned off with separate switches in the settings.
+**Windows notification** carrying the first lines of the answer — often enough to get the gist at a
+glance. Clicking the notification opens the widget and puts the caret straight into the input
+field. Both the notification and its sound can be turned off with separate switches in the settings.
+
+## Log and recovery
+
+The widget writes its output to `%APPDATA%\harness-widget\widget.log` — the console is invisible
+when launched through `.cmd`, so without a log there is nothing to debug with. The file is trimmed
+so it cannot grow forever, and it can be opened from the tray menu.
+
+If the Harness restarts, the widget checks the address every 15 seconds and reconnects on its own as
+soon as the server responds again.
 
 ## Portable build
 
@@ -345,6 +356,7 @@ about it here than to promise a signed installer.
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
 
 
 

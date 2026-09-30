@@ -288,14 +288,30 @@
     return !!document.querySelector('[class*="_running"]');
   }
 
+  // Текст последнего ответа: берём последний блок разметки в ленте. Нужен для
+  // уведомления — чтобы по нему часто можно было понять ответ без открытия окна.
+  function lastAnswerText() {
+    const blocks = document.querySelectorAll('[class*="_scrollBody"] [class*="_markdown_"]');
+    const last = blocks[blocks.length - 1];
+    if (!last) return '';
+    return (last.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+  }
+
   function watchAnswer() {
     const busy = agentBusy();
     if (wasBusy === null) {
       wasBusy = busy;
       return;
     }
-    if (!wasBusy && busy) window.dshWidget?.action('agent-busy');
-    if (wasBusy && !busy) window.dshWidget?.action('agent-answer');
+    if (!wasBusy && busy) {
+      if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'busy' });
+      else window.dshWidget?.action('agent-busy');
+    }
+    if (wasBusy && !busy) {
+      const text = lastAnswerText();
+      if (window.dshWidget?.notify) window.dshWidget.notify({ kind: 'answer', text });
+      else window.dshWidget?.action('agent-answer');
+    }
     wasBusy = busy;
   }
 

@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld('dshWidget', {
   action: (name) => {
     if (ALLOWED.has(String(name))) ipcRenderer.send('widget:action', String(name));
   },
+  notify: (payload) => {
+    try {
+      ipcRenderer.send('widget:notify', JSON.parse(JSON.stringify(payload)));
+    } catch {
+      /* сообщение не критично */
+    }
+  },
   report: (payload) => {
     try {
       ipcRenderer.send('widget:opacity-report', JSON.parse(JSON.stringify(payload)));
@@ -24,3 +31,4 @@ contextBridge.exposeInMainWorld('dshWidget', {
 
 // Флаг для диагностики прозрачности: включается только переменной окружения.
 contextBridge.exposeInMainWorld('__WIDGET_OPACITY_REPORT', process.env.WIDGET_OPACITY_REPORT === '1');
+

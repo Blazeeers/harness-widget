@@ -549,6 +549,12 @@ let hotkeyError = '';
 let focusHotkeyError = '';
 // Состояние агента для значка в трее: idle | busy | done.
 let agentState = 'idle';
+// Момент начала работы агента — для времени в подсказке трея.
+let busySince = 0;
+// Пункт меню трея «Остановить агента», доступный только во время работы.
+let trayStopItem = null;
+// Пока агент работает, подсказка трея обновляет время каждую секунду.
+let trayTimer = null;
 
 // Автозапуск при входе в Windows. По умолчанию виджет прописывается с флагом
 // --hidden: стартует скрытым, живёт в трее и появляется по горячей клавише.
@@ -832,6 +838,104 @@ function rebuildWindow() {
 
 // ---------------------------------------------------------------- tray
 
+// ---------------------------------------------------------------- журнал
+
+// Пишем вывод виджета в файл: при запуске через .cmd консоль не видна, и без
+// журнала разбираться с ошибками нечем. Файл подрезается, чтобы не расти вечно.
+const LOG_PATH = path.join(app.getPath('userData'), 'widget.log');
+const LOG_LIMIT = 256 * 1024;
+
+function writeLog(line) {
+  try {
+    fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
+    fs.appendFileSync(LOG_PATH, line);
+    const stats = fs.statSync(LOG_PATH);
+    if (stats.size > LOG_LIMIT) {
+      // Оставляем последнюю половину: свежие записи важнее старых.
+      const content = fs.readFileSync(LOG_PATH, 'utf8');
+      fs.writeFileSync(LOG_PATH, content.slice(Math.floor(content.length / 2)));
+    }
+  } catch {
+    /* журнал не должен мешать работе */
+  }
+}
+
+function mirrorConsoleToFile() {
+  const stamp = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
+  for (const level of ['log', 'warn', 'error']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+      original(...args);
+      const text = args
+        .map((value) => (typeof value === 'string' ? value : JSON.stringify(value)))
+        .join(' ');
+      writeLog(`[${stamp()}] ${level.toUpperCase()} ${text}\n`);
+    };
+  }
+}
+
+// Периодически проверяем, жив ли харнесс. Если он поднялся заново, виджет
+// возвращает страницу сам — без кнопки «обновить» и без перезапуска.
+function startHealthWatch() {
+  setInterval(async () => {
+    if (serverUp || !win) return;
+    const url = resolveTargetUrl();
+    if (!url) return;
+    try {
+      await new Promise((resolve, reject) => {
+        const request = net.request({ method: 'GET', url });
+        request.on('response', (response) => {
+          response.on('data', () => {});
+          response.on('end', resolve);
+        });
+        request.on('error', reject);
+        request.end();
+      });
+      console.log('[widget] харнесс снова отвечает — переподключаюсь');
+      loadHarness();
+    } catch {
+      /* ещё не поднялся — попробуем в следующий раз */
+    }
+  }, 15000);
+}
+
+// Переход «агент начал работать»: обновляем значок и запускаем отсчёт времени.
+function setAgentBusy() {
+  if (agentState === 'busy') return;
+  agentState = 'busy';
+  busySince = Date.now();
+  updateTrayState();
+  if (!trayTimer) trayTimer = setInterval(updateTrayState, 1000);
+}
+
+// Переход «агент ответил»: значок, всплытие и уведомление с текстом ответа.
+function handleAgentAnswer(text) {
+  agentState = 'done';
+  busySince = 0;
+  if (trayTimer) {
+    clearInterval(trayTimer);
+    trayTimer = null;
+  }
+  updateTrayState();
+  console.log('[widget] ответ агента готов; окно было видимо:', windowState.visible,
+    '| текст для уведомления:', String(text || '').slice(0, 60) || '(нет)');
+  if (config.popupOnAnswer !== false && !windowState.visible) {
+    showWindow();
+    win?.flashFrame(true);
+  }
+  notifyAnswer(text);
+}
+
+// Остановить агента из трея: нажимаем ту же кнопку, что и в интерфейсе.
+function stopAgent() {
+  if (!harnessView) return;
+  harnessView.webContents.executeJavaScript(
+    '(() => { const b = document.querySelector(\'[class*="_composerSeat"] [class*="_primary"]\');'
+    + ' if (!b) return "кнопки нет"; const label = b.getAttribute("aria-label") || "";'
+    + ' if (!/stop/i.test(label)) return "агент не генерирует"; b.click(); return "нажата"; })()',
+  ).then((result) => console.log('[widget] остановка агента:', result)).catch(() => {});
+}
+
 function trayIcon(variant = 'idle') {
   const names = { idle: 'icon.png', busy: 'icon-busy.png', done: 'icon-done.png' };
   for (const name of [names[variant], names.idle]) {
@@ -845,31 +949,52 @@ function trayIcon(variant = 'idle') {
 
 // Состояние агента в трее: работает — янтарная точка, ответил — зелёная.
 // Как только окно получило фокус, состояние возвращается к обычному.
+function sessionTitle() {
+  try {
+    return (harnessView && harnessView.webContents.getTitle()) || '';
+  } catch {
+    return '';
+  }
+}
+
+function elapsedLabel() {
+  if (!busySince) return '';
+  const total = Math.max(0, Math.round((Date.now() - busySince) / 1000));
+  const minutes = Math.floor(total / 60);
+  return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+}
+
 function updateTrayState() {
   if (!tray) return;
   const variant = agentState === 'busy' ? 'busy' : (agentState === 'done' ? 'done' : 'idle');
   tray.setImage(trayIcon(variant));
-  const labels = {
-    idle: 'Harness Widget',
-    busy: 'Harness Widget — агент работает',
-    done: 'Harness Widget — ответ готов',
-  };
-  tray.setToolTip(labels[variant] || labels.idle);
+  const session = sessionTitle();
+  const parts = ['Harness Widget'];
+  if (session) parts.push(session);
+  if (variant === 'busy') parts.push(`агент работает ${elapsedLabel()}`.trim());
+  else if (variant === 'done') parts.push('ответ готов');
+  else if (serverUp === false) parts.push('харнесс недоступен');
+  tray.setToolTip(parts.join(' — '));
+  // Пункт «Остановить агента» имеет смысл только пока агент работает.
+  if (trayStopItem) trayStopItem.enabled = variant === 'busy';
 }
 
 // Тост Windows о готовом ответе: всплытие окна не видно, если ты в полноэкранной
-// игре, а уведомление видно всегда. Клик по нему открывает виджет.
-function notifyAnswer() {
+// игре, а уведомление видно всегда. Показываем первые строки ответа, чтобы чаще
+// хватало одного взгляда, и по клику открываем виджет с курсором в поле ввода.
+function notifyAnswer(answer) {
   if (config.notifyOnAnswer === false) return;
   if (!Notification.isSupported()) return;
   try {
+    const session = sessionTitle();
+    const body = String(answer || '').replace(/\s+/g, ' ').trim().slice(0, 220);
     const notification = new Notification({
-      title: 'Ответ готов',
-      body: 'Агент закончил отвечать — можно посмотреть результат.',
+      title: session ? `${session} — ответ готов` : 'Ответ готов',
+      body: body || 'Агент закончил отвечать — можно посмотреть результат.',
       icon: path.join(ROOT, 'assets', 'icon-done.png'),
       silent: config.notifySound === false,
     });
-    notification.on('click', () => showWindow());
+    notification.on('click', () => focusComposer());
     notification.show();
   } catch (err) {
     console.error('[widget] уведомление:', err.message);
@@ -877,6 +1002,8 @@ function notifyAnswer() {
 }
 
 function buildTrayMenu() {
+  // Пункт создаём заранее: на него ссылается updateTrayState, включая и выключая его.
+  trayStopItem = { label: 'Остановить агента', enabled: agentState === 'busy', click: stopAgent };
   const up = serverUp;
   return Menu.buildFromTemplate([
     { label: up ? 'Harness: сервер работает' : 'Harness: сервер недоступен', enabled: false },
@@ -906,6 +1033,9 @@ function buildTrayMenu() {
         pushState();
       },
     },
+    trayStopItem,
+    { label: 'Настройки', click: () => { showWindow(); showSettings(); } },
+    { label: 'Открыть журнал', click: () => shell.openPath(LOG_PATH) },
     { label: 'Обновить страницу', click: () => loadHarness() },
     {
       label: 'Вернуть панель к правому краю',
@@ -1237,6 +1367,14 @@ function toggleSettings() {
 
 // ---------------------------------------------------------------- ipc
 
+// Страница сообщает о состоянии агента: busy — начал работать, answer — закончил.
+// В сообщении об ответе приходит и текст, чтобы уведомление было содержательным.
+ipcMain.on('widget:notify', (_event, payload) => {
+  const kind = payload && payload.kind;
+  if (kind === 'busy') setAgentBusy();
+  else if (kind === 'answer') handleAgentAnswer(payload.text);
+});
+
 // Диагностика прозрачности: страница присылает найденные полупрозрачные
 // поверхности, мы складываем их в файл — чтобы разбирать проблему на живом окне.
 ipcMain.on('widget:opacity-report', (_event, payload) => {
@@ -1281,21 +1419,11 @@ ipcMain.on('widget:action', (_event, action) => {
       break;
     // Агент начал отвечать — янтарная точка в трее.
     case 'agent-busy':
-      if (agentState !== 'busy') {
-        agentState = 'busy';
-        updateTrayState();
-      }
+      setAgentBusy();
       break;
     // Агент закончил: зелёная точка, всплытие и уведомление Windows.
     case 'agent-answer':
-      agentState = 'done';
-      updateTrayState();
-      console.log('[widget] ответ агента готов; окно было видимо:', windowState.visible);
-      if (config.popupOnAnswer !== false && !windowState.visible) {
-        showWindow();
-        win?.flashFrame(true);
-      }
-      notifyAnswer();
+      handleAgentAnswer('');
       break;
     case 'start-harness':
       runLauncher('Start-Harness.ps1');
@@ -1356,9 +1484,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showWindow());
 
   app.whenReady().then(async () => {
+    mirrorConsoleToFile();
     loadWindowState();
     createWindow();
     createTray();
+    startHealthWatch();
 
     ({ hotkeyError, focusHotkeyError } = registerHotkeys());
     if (hotkeyError) console.error('[widget] горячая клавиша:', hotkeyError);
@@ -1551,6 +1681,10 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
+
+
+
 
 
 
