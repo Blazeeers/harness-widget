@@ -13,5 +13,6 @@
   "glassAlpha": 0.06,
   "cardAlpha": 0.14,
   "animate": true,
-  "blur": false
+  "blur": false,
+  "showOnStartup": false
 }

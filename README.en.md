@@ -146,7 +146,8 @@ created, so the page reloads. The session lives on the server and comes back in 
   "zoomWindow": 1,                               // UI scale in the full window
   "menuScale": 1,                                // session menu scale
   "modelScale": 1,                               // model picker dialog scale
-  "alwaysOnTop": true
+    "showOnStartup": false,                        // open the window immediately at Windows sign-in
+"alwaysOnTop": true
 }
 ```
 
@@ -217,8 +218,24 @@ every 5 seconds.
 
 ## Autostart
 
-Tray menu → “Start at Windows sign-in”. Or a shortcut to
-`node_modules\electron\dist\electron.exe` with an argument — the path to the widget folder.
+Tray menu → “Start at Windows sign-in”. The widget is registered in the user’s startup entries
+(the `HKCU\...\CurrentVersion\Run` registry key) with the `--hidden` flag: on sign-in it starts
+**hidden and waits in the tray** without opening a window. From there the global hotkey
+(`Ctrl+Space` by default) or a click on the tray icon brings it up.
+
+If you want the window to open immediately at sign-in, enable “Open at sign-in too” in the tray
+menu — the `--hidden` flag is then removed from the startup entry.
+
+To disable autostart, clear the checkbox on the same menu item. Alternatively, create a shortcut
+to `node_modules\electron\dist\electron.exe` with the widget folder path and `--hidden` as
+arguments.
+
+You can verify what was written like this:
+
+```powershell
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' |
+  Select-Object -ExpandProperty 'electron.app.Electron'
+```
 
 ## Layout
 
@@ -275,3 +292,4 @@ third-party graphics files in the repository.
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+

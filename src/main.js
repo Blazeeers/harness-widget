@@ -21,6 +21,9 @@ const PANEL_MARGIN = 8;
 const PANEL_MENU_BASE_WIDTH = 280;
 
 const SCREENSHOT_MODE = process.argv.includes('--screenshot') || !!process.env.WIDGET_SHOT;
+// Флаг автозагрузки: виджет стартует скрытым и ждёт в трее, пока его не позовут
+// горячей клавишей. Именно с этим аргументом он прописывается в автозапуск Windows.
+const START_HIDDEN = process.argv.includes('--hidden');
 // Отладочные хуки: WIDGET_EVAL — выполнить JS на странице харнесса и напечатать результат,
 // WIDGET_CSS — внедрить CSS-файл перед снятием снимка.
 const EVAL_CODE = process.env.WIDGET_EVAL || '';
@@ -43,6 +46,9 @@ const DEFAULT_CONFIG = {
   cardAlpha: 0.7,
   animate: true,
   blur: false,
+  // Открывать окно сразу при входе в Windows. По умолчанию виджет ждёт в трее,
+  // пока его не позовут горячей клавишей.
+  showOnStartup: false,
   alwaysOnTop: true,
 };
 
@@ -534,6 +540,24 @@ function glassEnabled() {
 // возвращает false, и мы возвращаем прежнее сочетание.
 let hotkeyError = '';
 
+// Автозапуск при входе в Windows. По умолчанию виджет прописывается с флагом
+// --hidden: стартует скрытым, живёт в трее и появляется по горячей клавише.
+// Включённая настройка «Открывать при входе сразу» убирает этот флаг.
+function setAutostart(enable) {
+  const args = app.isPackaged ? [] : [ROOT];
+  if (config.showOnStartup !== true) args.push('--hidden');
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: enable,
+      path: process.execPath,
+      args,
+    });
+    console.log('[widget] автозапуск:', enable ? 'включён' : 'выключен', JSON.stringify(args));
+  } catch (err) {
+    console.error('[widget] автозапуск:', err.message);
+  }
+}
+
 function registerHotkey(accelerator) {
   try {
     globalShortcut.unregisterAll();
@@ -702,6 +726,13 @@ function createWindow() {
   });
 
   loadHarness().then(() => {
+    // Запуск из автозагрузки: окно ждёт в трее, пока его не позовут горячей
+    // клавишей или кликом по значку.
+    if (START_HIDDEN) {
+      windowState.visible = false;
+      pushState();
+      return;
+    }
     showWindow();
   });
 }
@@ -782,11 +813,19 @@ function buildTrayMenu() {
       type: 'checkbox',
       checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => {
-        app.setLoginItemSettings({
-          openAtLogin: item.checked,
-          path: process.execPath,
-          args: app.isPackaged ? [] : [ROOT],
-        });
+        setAutostart(item.checked);
+        refreshTray();
+      },
+    },
+    {
+      label: 'Открывать при входе сразу',
+      type: 'checkbox',
+      checked: config.showOnStartup === true,
+      click: (item) => {
+        config.showOnStartup = item.checked;
+        saveConfig();
+        if (app.getLoginItemSettings().openAtLogin) setAutostart(true);
+        refreshTray();
       },
     },
     { label: 'Папка виджета', click: () => shell.openPath(ROOT) },
@@ -1158,6 +1197,18 @@ if (!app.requestSingleInstanceLock()) {
       hotkeyError = `Сочетание ${config.hotkey} занято другой программой`;
       console.error('[widget] не удалось занять горячую клавишу', config.hotkey);
     }
+
+    // Разовая настройка автозапуска из командной строки:
+    // WIDGET_AUTOSTART=1 включает, WIDGET_AUTOSTART=0 выключает.
+    if (process.env.WIDGET_AUTOSTART) {
+      setAutostart(process.env.WIDGET_AUTOSTART !== '0');
+      refreshTray();
+    }
+    console.log(
+      '[widget] старт: автозапуск',
+      app.getLoginItemSettings().openAtLogin ? 'включён' : 'выключен',
+      START_HIDDEN ? '(скрыто, ждёт в трее)' : '(окно показано)',
+    );
 
     if (process.env.WIDGET_MOVE_TEST) {
       // Проверка памяти положения: двигаем окно как мышью, затем прячем и показываем.
