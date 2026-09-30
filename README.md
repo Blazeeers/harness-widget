@@ -1,11 +1,6 @@
 # Harness Widget
 
-**EN:** A compact always-on-top Windows widget that wraps an already-running
-[DeepSeek Harness](https://www.npmjs.com/package/@deepseek-ai/dsh) web host. It does not bundle
-or replace the Harness — it connects to the same local server (`http://127.0.0.1:3080`), so the
-profile, session list, history and the current conversation are exactly the same as in a browser,
-just without the browser. Electron + `BaseWindow`, three `WebContentsView`s, tray icon and a
-global hotkey. See [Third-party resources](#сторонние-ресурсы) for the full list of dependencies.
+[English](README.en.md) · **Русский**
 
 Компактная оконная оболочка для **уже работающего** веб-хоста DeepSeek Harness.
 
@@ -280,18 +275,4 @@ CSS-классам его интерфейса по суффиксам моду�
 
 MIT — см. [LICENSE](LICENSE). Проект не связан с DeepSeek; «DeepSeek» и логотип принадлежат
 их правообладателям.
-
-src/toolbar.html       своя шапка окна (drag-зона, кнопки, индикатор сервера)
-src/settings.html      окно настроек, раздел «Интерфейс»
-src/widget.css         правки внешнего вида страницы харнесса внутри виджета
-src/widget.js          скрипт-скин страницы: значок модели с режимом рассуждений
-src/preload-toolbar.js мост шапки
-src/preload-harness.js ограниченный мост для страницы харнесса
-src/preload-settings.js мост окна настроек
-src/offline.html       заглушка «сервер не отвечает»
-tools/make-icon.js     генерация assets/icon.png для трея
-tools/probe-*.js       отладочные скрипты для разбора DOM страницы
-config.example.json    образец настроек (рабочий config.json в репозиторий не попадает)
-LICENSE                лицензия MIT
-```
 
