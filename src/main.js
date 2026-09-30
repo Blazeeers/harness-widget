@@ -543,9 +543,29 @@ let hotkeyError = '';
 // Автозапуск при входе в Windows. По умолчанию виджет прописывается с флагом
 // --hidden: стартует скрытым, живёт в трее и появляется по горячей клавише.
 // Включённая настройка «Открывать при входе сразу» убирает этот флаг.
-function setAutostart(enable) {
+// Аргументы, с которыми виджет прописывается в автозагрузку.
+function autostartArgs() {
   const args = app.isPackaged ? [] : [ROOT];
   if (config.showOnStartup !== true) args.push('--hidden');
+  return args;
+}
+
+// Состояние автозапуска. Спрашивать нужно ровно с теми же аргументами, с которыми
+// запись создавалась: Electron сравнивает их с текущими и без совпадения отвечает
+// «выключено», хотя запись в реестре есть.
+function autostartEnabled() {
+  try {
+    return app.getLoginItemSettings({
+      path: process.execPath,
+      args: autostartArgs(),
+    }).openAtLogin === true;
+  } catch {
+    return false;
+  }
+}
+
+function setAutostart(enable) {
+  const args = autostartArgs();
   try {
     app.setLoginItemSettings({
       openAtLogin: enable,
@@ -811,7 +831,7 @@ function buildTrayMenu() {
     {
       label: 'Запускать при входе в Windows',
       type: 'checkbox',
-      checked: app.getLoginItemSettings().openAtLogin,
+      checked: autostartEnabled(),
       click: (item) => {
         setAutostart(item.checked);
         refreshTray();
@@ -824,7 +844,7 @@ function buildTrayMenu() {
       click: (item) => {
         config.showOnStartup = item.checked;
         saveConfig();
-        if (app.getLoginItemSettings().openAtLogin) setAutostart(true);
+        if (autostartEnabled()) setAutostart(true);
         refreshTray();
       },
     },
@@ -1206,7 +1226,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     console.log(
       '[widget] старт: автозапуск',
-      app.getLoginItemSettings().openAtLogin ? 'включён' : 'выключен',
+      autostartEnabled() ? 'включён' : 'выключен',
       START_HIDDEN ? '(скрыто, ждёт в трее)' : '(окно показано)',
     );
 
@@ -1371,4 +1391,5 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
 
