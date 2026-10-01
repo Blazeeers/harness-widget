@@ -22,3 +22,5 @@ Thumbs.db
 desktop.ini
 *.log
 dist/
+dist-linux/
+dist-linux-ci/

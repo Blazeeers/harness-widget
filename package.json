@@ -1,6 +1,6 @@
 {
   "name": "harness-widget",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Compact always-on-top Windows widget for an already-running DeepSeek Harness web host",
   "main": "src/main.js",
   "license": "MIT",
