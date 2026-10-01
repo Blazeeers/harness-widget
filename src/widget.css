@@ -85,8 +85,10 @@ body {
   height: auto !important;
 }
 [class*="_item_"]:not([class*="_itemWrap"]):not([class*="_itemLabel"]):not([class*="_itemIcon"]) {
-  /* Высота у харнесса задана жёстко, поэтому её нужно перебить явно. */
-  height: 34px !important;
+  /* Только минимальная высота: у части пунктов (например у режимов агента) есть
+     описание в несколько строк, и жёсткая высота заставляла их налезать друг
+     на друга. Высота должна расти по содержимому. */
+  height: auto !important;
   min-height: 34px !important;
   padding: 8px 12px !important;
   gap: 10px !important;
