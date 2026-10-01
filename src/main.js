@@ -1181,7 +1181,10 @@ function buildDynamicCss() {
     );
   }
   if (model !== 1) {
-    rules.push(`[role="menu"] { zoom: ${model} !important; }`);
+    // Масштаб диалога выбора модели — только для него. Компактные списки
+    // (например «...» в шапке) помечены классом _list_ и масштабироваться не
+    // должны: иначе меню становится мелким вопреки своим размерам.
+    rules.push(`[role="menu"]:not([class*="_list_"]) { zoom: ${model} !important; }`);
   }
   return rules.join('\n');
 }
