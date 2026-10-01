@@ -365,8 +365,11 @@ powershell -ExecutionPolicy Bypass -File tools\build-portable.ps1
 
 ## Лицензия
 
+История версий — [CHANGELOG.md](CHANGELOG.md).
+
 MIT — см. [LICENSE](LICENSE). Проект не связан с DeepSeek; «DeepSeek» и логотип принадлежат
 их правообладателям.
+
 
 
 

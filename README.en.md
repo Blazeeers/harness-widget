@@ -363,8 +363,11 @@ about it here than to promise a signed installer.
 
 ## Licence
 
+Version history — [CHANGELOG.md](CHANGELOG.md).
+
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
 
 
 
