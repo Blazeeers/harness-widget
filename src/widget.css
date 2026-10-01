@@ -72,6 +72,38 @@ body {
   background-color: var(--dsw-alias-bg-layer-1, #1f1f21) !important;
 }
 
+/* ── Всплывающие меню харнесса ────────────────────────────────────────────
+   Компактные списки («...» в шапке) рассчитаны на шрифт 13px и высоту пункта
+   18px — в панели виджета это нечитаемо мелко. Увеличиваем текст, отступы и
+   ширину: меню должно быть удобным, а не ювелирным. */
+[class*="_list_"]:not([class*="_listItem"]) {
+  min-width: 200px !important;
+  padding: 6px !important;
+}
+[class*="_itemWrap_"] {
+  min-height: 34px !important;
+  height: auto !important;
+}
+[class*="_item_"]:not([class*="_itemWrap"]):not([class*="_itemLabel"]):not([class*="_itemIcon"]) {
+  /* Высота у харнесса задана жёстко, поэтому её нужно перебить явно. */
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 8px 12px !important;
+  gap: 10px !important;
+  font-size: 14px !important;
+}
+[class*="_itemLabel_"] {
+  font-size: 14px !important;
+}
+[class*="_itemIcon_"] {
+  width: 18px !important;
+  height: 18px !important;
+}
+[class*="_itemIcon_"] svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
 /* ── Всплывающие слои: плотный фон ────────────────────────────────────────
    Скрипт помечает всплывающие слои и их фоновые подложки. У харнесса фон
    «материала» полупрозрачный, из-за чего сквозь меню и подсказки видно
