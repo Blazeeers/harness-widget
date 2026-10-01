@@ -20,6 +20,16 @@ const PANEL_MARGIN = 8;
 // Ширина развёрнутого меню сессий у харнесса; от неё считается масштаб меню.
 const PANEL_MENU_BASE_WIDTH = 280;
 
+// Платформа. От неё зависит немногое, но это немногое важное: прозрачность окна,
+// автозапуск, ярлык приложения и возможность двигать окно самому.
+const IS_WIN = process.platform === 'win32';
+const IS_LINUX = process.platform === 'linux';
+const IS_MAC = process.platform === 'darwin';
+// Под Wayland приложение не может само поставить окно по координатам: композитор
+// решает это за него. Значит, ни парковки у края, ни выезда из-за края там не будет.
+const IS_WAYLAND = IS_LINUX
+  && (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY);
+
 const SCREENSHOT_MODE = process.argv.includes('--screenshot') || !!process.env.WIDGET_SHOT;
 // Флаг автозагрузки: виджет стартует скрытым и ждёт в трее, пока его не позовут
 // горячей клавишей. Именно с этим аргументом он прописывается в автозапуск Windows.
@@ -43,7 +53,9 @@ const DEFAULT_CONFIG = {
   zoomWindow: 1,
   menuScale: 1,
   modelScale: 1,
-  glass: true,
+  // Прозрачное окно на Windows работает всегда, на Linux требует композитора,
+  // поэтому там по умолчанию выключено. Включается переключателем в настройках.
+  glass: IS_WIN,
   glassAlpha: 0.55,
   cardAlpha: 0.7,
   animate: true,
@@ -162,6 +174,11 @@ function probeServer(url) {
 // ---------------------------------------------------------------- launcher control
 
 function launcherScript(name) {
+  // На Windows лаунчер — PowerShell-скрипты, на Linux — одноимённые .sh.
+  if (IS_WIN) return path.join(config.launcherDir, name);
+  const shellName = name.replace(/\.ps1$/i, '.sh');
+  const shellPath = path.join(config.launcherDir, shellName);
+  if (fs.existsSync(shellPath)) return shellPath;
   return path.join(config.launcherDir, name);
 }
 
@@ -369,6 +386,13 @@ function stopAnimation() {
 function animateWindowTo(target, { onDone } = {}) {
   if (!win) return;
   stopAnimation();
+  // Под Wayland композитор сам решает, где стоять окну: двигать его мы не можем,
+  // поэтому просто применяем размеры без анимации.
+  if (IS_WAYLAND) {
+    win.setBounds(target);
+    onDone?.();
+    return;
+  }
   const start = win.getBounds();
   if (start.x === target.x && start.y === target.y) {
     win.setBounds(target);
@@ -540,7 +564,46 @@ function applyZoom() {
 }
 
 function glassEnabled() {
-  return process.platform === 'win32' && !!config.glass;
+  // На Windows прозрачность работает всегда, на Linux — только с композитором,
+  // поэтому там она включается осознанно, переключателем в настройках.
+  if (IS_WIN || IS_LINUX) return !!config.glass;
+  return false;
+}
+
+// ---------------------------------------------------------------- автозапуск
+
+// Путь к файлу автозапуска в Linux: ~/.config/autostart/harness-widget.desktop
+function linuxAutostartFile() {
+  return path.join(app.getPath('home'), '.config', 'autostart', 'harness-widget.desktop');
+}
+
+function writeLinuxAutostart(enable) {
+  const file = linuxAutostartFile();
+  if (!enable) {
+    try {
+      fs.unlinkSync(file);
+      console.log('[widget] автозапуск выключен (удалён', file, ')');
+    } catch { /* файла и не было */ }
+    return;
+  }
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const hidden = config.showOnStartup === true ? '' : ' --hidden';
+    const exec = app.isPackaged ? process.execPath : `${process.execPath} ${ROOT}`;
+    fs.writeFileSync(file, [
+      '[Desktop Entry]',
+      'Type=Application',
+      'Name=Harness Widget',
+      'Comment=Панель DeepSeek Harness',
+      `Exec=${exec}${hidden}`,
+      'Terminal=false',
+      'X-GNOME-Autostart-enabled=true',
+      '',
+    ].join('\n'));
+    console.log('[widget] автозапуск включён:', file);
+  } catch (err) {
+    console.error('[widget] автозапуск:', err.message);
+  }
 }
 
 // Горячая клавиша может быть занята другой программой — тогда регистрация
@@ -570,6 +633,7 @@ function autostartArgs() {
 // запись создавалась: Electron сравнивает их с текущими и без совпадения отвечает
 // «выключено», хотя запись в реестре есть.
 function autostartEnabled() {
+  if (IS_LINUX) return fs.existsSync(linuxAutostartFile());
   try {
     return app.getLoginItemSettings({
       path: process.execPath,
@@ -581,6 +645,11 @@ function autostartEnabled() {
 }
 
 function setAutostart(enable) {
+  if (IS_LINUX) {
+    writeLinuxAutostart(enable);
+    return;
+  }
+  if (!IS_WIN && !IS_MAC) return;
   const args = autostartArgs();
   try {
     app.setLoginItemSettings({
@@ -657,7 +726,7 @@ function blurEnabled() {
 }
 
 function applyGlass() {
-  if (!win || process.platform !== 'win32') return;
+  if (!win || !IS_WIN) return;
   const on = glassEnabled();
   if (!on) {
     try {
@@ -1075,11 +1144,18 @@ function buildTrayMenu() {
 }
 
 function createTray() {
-  tray = new Tray(trayIcon('idle'));
-  updateTrayState();
-  console.log('[widget] значок в трее создан:', JSON.stringify({ tip: tray ? 'да' : 'нет' }));
-  tray.setContextMenu(buildTrayMenu());
-  tray.on('click', toggleWindow);
+  // В Linux значок требует хоста индикаторов (в GNOME — расширения). Если его нет,
+  // виджет должен продолжать работать: окно и горячие клавиши важнее значка.
+  try {
+    tray = new Tray(trayIcon('idle'));
+    updateTrayState();
+    tray.setContextMenu(buildTrayMenu());
+    tray.on('click', toggleWindow);
+    console.log('[widget] значок в трее создан');
+  } catch (err) {
+    tray = null;
+    console.error('[widget] трей недоступен:', err.message);
+  }
 }
 
 function refreshTray() {
@@ -1495,12 +1571,13 @@ async function captureScreenshots(tag = '') {
 // уведомление Windows запускает новый процесс вместо уже работающего окна.
 const APP_ID = 'com.blazeeers.harnesswidget';
 app.setName('Harness Widget');
-app.setAppUserModelId(APP_ID);
+// AppUserModelId — понятие Windows: на других системах вызов бессмысленен.
+if (IS_WIN) app.setAppUserModelId(APP_ID);
 
 // Ярлык в меню «Пуск» с тем же идентификатором: по нему Windows понимает, какому
 // приложению принадлежит уведомление, и передаёт клик работающему экземпляру.
 function ensureAppShortcut() {
-  if (process.platform !== 'win32') return;
+  if (!IS_WIN) return;
   try {
     const dir = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
     fs.mkdirSync(dir, { recursive: true });
@@ -1729,6 +1806,7 @@ if (!app.requestSingleInstanceLock()) {
     saveWindowState();
   });
 }
+
 
 
 

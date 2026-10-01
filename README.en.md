@@ -12,7 +12,7 @@ global hotkey.
 
 ## Requirements
 
-- Windows 10 or 11 (tested on Windows 11 26200). Background transparency requires Windows
+- Windows 10 or 11 (tested on Windows 11 26200) or Linux (X11; see the Linux section below). Background transparency requires Windows
   transparency effects to be enabled: *Settings → Personalisation → Colours → Transparency effects*.
 - Node.js 18+ and npm — only to install the dependency.
 - A running Harness reachable at `127.0.0.1:3080` (`npx @deepseek-ai/dsh web`).
@@ -329,6 +329,45 @@ so it cannot grow forever, and it can be opened from the tray menu.
 If the Harness restarts, the widget checks the address every 15 seconds and reconnects on its own as
 soon as the server responds again.
 
+## Linux
+
+The widget runs on Linux too. What is there and what is not — honestly:
+
+| Feature | State |
+|---|---|
+| Panel, Harness page, settings, UI skins | works |
+| Tray icon | works, but GNOME needs an indicator host (AppIndicator extension). Without it the widget keeps working — there is just no icon |
+| Notifications | work (libnotify) |
+| Global hotkeys | work on X11; **do not work on Wayland** — an Electron limitation |
+| Docking to the edge and slide-in | work on X11; **on Wayland the compositor decides where the window goes**, so it appears wherever the system puts it and there is no animation |
+| Autostart | writes `~/.config/autostart/harness-widget.desktop` |
+| Background transparency | off by default: it needs a compositor. Enable with the "Frosted background" switch |
+| Background blur (Acrylic) | Windows only — it is a system API. On Linux blur is done by compositor rules (KWin, Hyprland) |
+| Harness launcher | looks for a `.sh` next to the `.ps1` |
+
+### Running
+
+```bash
+npm install
+npm start          # or ./start.sh
+```
+
+### Portable build
+
+```bash
+chmod +x tools/build-portable.sh
+./tools/build-portable.sh
+```
+
+Produces `dist-linux/HarnessWidget/` and `dist-linux/HarnessWidget-portable.tar.gz`, with
+`HarnessWidget.sh` to run and `Автозапуск.sh` to register autostart.
+
+### About verification
+
+The Linux code was written against the Electron documentation and **has not been tested on a
+live system**: the development machine has no Linux. What is verified automatically is that the
+widget boots under a virtual Xvfb display in CI (job `linux-boot`). Transparency, the tray and
+global hotkeys cannot be checked that way — they need a real distribution.
 ## Portable build
 
 The widget can be built into a folder that runs without Node.js and npm:
@@ -367,6 +406,7 @@ Version history — [CHANGELOG.md](CHANGELOG.md).
 
 MIT — see [LICENSE](LICENSE). The project is not affiliated with DeepSeek; “DeepSeek” and the
 logo belong to their respective owners.
+
 
 
 
