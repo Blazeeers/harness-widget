@@ -1181,10 +1181,18 @@ function buildDynamicCss() {
     );
   }
   if (model !== 1) {
-    // Масштаб диалога выбора модели — только для него. Компактные списки
-    // (например «...» в шапке) помечены классом _list_ и масштабироваться не
-    // должны: иначе меню становится мелким вопреки своим размерам.
-    rules.push(`[role="menu"]:not([class*="_list_"]) { zoom: ${model} !important; }`);
+    // Масштаб диалога выбора модели задаём размером шрифта, а не zoom: zoom
+    // сбивает позиционирование всплывающего окна, и оно уезжает от кнопки.
+    // Компактные списки (класс _list_) сюда не попадают — у них свой вид.
+    const base = Math.round(16 * model);
+    const cell = Math.round(13 * model);
+    rules.push(
+      `[role="menu"]:not([class*="_list_"]) { font-size: ${base}px !important; }`,
+      `[role="menu"]:not([class*="_list_"]) [class*="_cell"],`
+      + ` [role="menu"]:not([class*="_list_"]) [class*="_cellLabel"],`
+      + ` [role="menu"]:not([class*="_list_"]) [class*="_cellValue"]`
+      + ` { font-size: ${cell}px !important; }`,
+    );
   }
   return rules.join('\n');
 }
