@@ -1,0 +1,75 @@
+name: linux-boot
+
+# Проверяет, что виджет действительно запускается в Linux: поднимает его под
+# виртуальным экраном Xvfb и убеждается, что окно создано и страница загружена.
+# Проверить прозрачность, трей и глобальные клавиши так нельзя — только запуск.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  boot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Установка зависимостей
+        run: npm install --no-audit --no-fund
+
+      - name: Библиотеки Electron и виртуальный экран
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 \
+            || sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2 || true
+
+      - name: Запуск виджета под Xvfb
+        run: |
+          set -o pipefail
+          # --hidden: стартуем скрытым, как при автозапуске; окно всё равно создаётся.
+          xvfb-run -a npx electron . --hidden --no-sandbox > boot.log 2>&1 &
+          APP_PID=$!
+          sleep 25
+          echo "--- вывод виджета ---"
+          cat boot.log
+          echo "---------------------"
+          if grep -q "старт:" boot.log; then
+            echo "OK: виджет стартовал"
+          else
+            echo "ОШИБКА: нет строки о старте"; kill $APP_PID 2>/dev/null; exit 1
+          fi
+          if grep -qi "error\|ошибка" boot.log; then
+            echo "ВНИМАНИЕ: в выводе есть ошибки (см. выше)"
+          fi
+          if kill -0 $APP_PID 2>/dev/null; then
+            echo "OK: процесс жив после 25 секунд"
+          else
+            echo "ОШИБКА: процесс завершился сам"; exit 1
+          fi
+          kill $APP_PID 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: boot-log
+          path: boot.log
+          if-no-files-found: ignore
+
+      - name: Портативная сборка для Linux
+        run: |
+          chmod +x tools/build-portable.sh
+          ./tools/build-portable.sh
+          ls -lh dist-linux/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HarnessWidget-linux
+          path: dist-linux/HarnessWidget-portable.tar.gz
+          if-no-files-found: error
